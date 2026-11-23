@@ -2,7 +2,7 @@ syntax = "proto3";
 
 import "rootsdk/types.proto";
 
-// Spotify has no audio of its own: its tracks are matched to YouTube Music when they're about to play
+// YouTube and Spotify tracks play the same song found on SoundCloud, since neither gives the server usable audio
 enum Source {
     SOURCE_UNSPECIFIED = 0;
     SOURCE_YOUTUBE = 1;
@@ -96,6 +96,15 @@ message GetAudioResponse {
     string mime_type = 3;
 }
 
+message GetCoverRequest {
+    string url = 1;
+}
+
+message GetCoverResponse {
+    bytes data = 1;
+    string mime_type = 2;
+}
+
 message RemoveRequest {
     string track_id = 1;
 }
@@ -150,6 +159,7 @@ service PlayerService {
     rpc ResolveLink(ResolveLinkRequest) returns (ResolveLinkResponse);
     rpc AddTracks(AddTracksRequest) returns (StateResponse);
     rpc GetAudio(GetAudioRequest) returns (GetAudioResponse);
+    rpc GetCover(GetCoverRequest) returns (GetCoverResponse);
     rpc Remove(RemoveRequest) returns (StateResponse);
     rpc Move(MoveRequest) returns (StateResponse);
     rpc Play(PlayRequest) returns (StateResponse);

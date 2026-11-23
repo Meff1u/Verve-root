@@ -1,5 +1,6 @@
 import { playerServiceClient } from "@verve/gen-client";
 import constants from "../constants";
+import { takeSlot, wait } from "./pacing";
 
 type ProgressListener = (trackId: string, progress: number) => void;
 
@@ -7,18 +8,6 @@ type ProgressListener = (trackId: string, progress: number) => void;
 // URL for <audio>; a complete file in memory also seeks reliably on every platform, Android included
 const loaded = new Map<string, Promise<string>>();
 const listeners = new Set<ProgressListener>();
-
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-// Root allows a client 10 requests per second in total. Chunk requests from every download share one pace that stays
-// well under it, so searching, the import preview and the player controls always have requests left
-let nextSlot = 0;
-const takeSlot = async () => {
-    const now = Date.now();
-    const slot = Math.max(now, nextSlot);
-    nextSlot = slot + constants.chunkInterval;
-    if (slot > now) await wait(slot - now);
-};
 
 // A refused chunk (rate limit, a hiccup) is simply asked for again a bit later
 const fetchChunk = async (trackId: string, chunk: number) => {

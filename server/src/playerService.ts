@@ -5,6 +5,8 @@ import {
     AddTracksRequest,
     GetAudioRequest,
     GetAudioResponse,
+    GetCoverRequest,
+    GetCoverResponse,
     GetStateResponse,
     MoveRequest,
     PlayRequest,
@@ -26,6 +28,7 @@ import {
 } from "@verve/gen-shared";
 import { getAudioChunk, prepareAudio, retainAudio } from "./audioCache";
 import constants from "./constants";
+import { getCover } from "./covers";
 import { importLink, search } from "./sources";
 import { Audio, emptyTrack, LinkContents, makeTrack } from "./sources/track";
 
@@ -252,6 +255,14 @@ export class PlayerService extends PlayerServiceBase {
             .map((track) => fromClient(track, client.userId));
         if (!tracks.length) throw fail(PlayerError.TRACK_NOT_FOUND, "Nothing to add");
         return this.enqueue(tracks, client);
+    }
+
+    async getCover(request: GetCoverRequest): Promise<GetCoverResponse> {
+        try {
+            return await getCover(request.url);
+        } catch (error) {
+            throw fail(PlayerError.SOURCE_FAILED, "This cover couldn't be loaded", error);
+        }
     }
 
     async getAudio(request: GetAudioRequest): Promise<GetAudioResponse> {

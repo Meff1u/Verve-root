@@ -1,20 +1,16 @@
-import vm from "vm";
-import { Innertube, Platform } from "youtubei.js";
+import { Innertube } from "youtubei.js";
 import { Source, Track } from "@verve/gen-shared";
-import constants from "../constants";
-import { Audio, collect, isPlayableLength, LinkContents, makeTrack, matchesTitle } from "./track";
+import { isPlayableLength, LinkContents, makeTrack } from "./track";
 
 type Thumbnail = { url: string; width: number };
 
-// Stream URLs are scrambled by a function inside YouTube's player script, and youtubei.js asks us to run it.
-// It runs in an empty vm context with a time limit, so the script can't reach the server's code, files or network
-Platform.shim.eval = (data) => vm.runInNewContext(`(function () {\n${data.output}\n})()`, { URL, URLSearchParams }, { timeout: constants.youtubeEvalTimeoutMs });
-
 let session: Promise<Innertube> | null = null;
 
-// Opening a session costs a round trip to YouTube, so one is shared and only recreated after it fails
+// Opening a session costs a round trip to YouTube, so one is shared and only recreated after it fails. It's used for
+// searching and reading links only: the player script needed for downloads costs ~280 MB of memory, more than Root's
+// server allows, and YouTube cuts downloads off after the first megabyte anyway
 const getSession = () => {
-    session ??= Innertube.create({ retrieve_player: true }).catch((error) => {
+    session ??= Innertube.create({ retrieve_player: false }).catch((error) => {
         session = null;
         throw error;
     });
@@ -91,52 +87,4 @@ export const importYoutube = async (url: URL): Promise<LinkContents> => {
         })
         .filter((track) => track.sourceId && isPlayableLength(track));
     return { title: playlist.info.title ?? "", tracks };
-};
-
-// YouTube refuses different clients at different times, so each is tried in turn, and once more with a fresh session
-// in case the old one went stale
-const downloadVideo = async (videoId: string): Promise<Audio> => {
-    let lastError: unknown;
-
-    for (let attempt = 0; attempt < 2; attempt++) {
-        const yt = await getSession();
-        for (const client of constants.youtubeClients) {
-            try {
-                const stream = await yt.download(videoId, { type: "audio", quality: "best", format: "mp4", client });
-                return { data: await collect(stream), mimeType: "audio/mp4" };
-            } catch (error) {
-                lastError = error;
-            }
-        }
-        session = null;
-    }
-    throw lastError;
-};
-
-// Other uploads of the same song (official video, lyric video, topic channel): same title and about the same length
-const findAlternatives = async (track: Track) => {
-    const yt = await getSession();
-    const results = await yt.search(`${track.artist} ${track.title}`, { type: "video" });
-    const videos = (results.videos ?? []) as unknown as { id?: string; title?: { text?: string }; duration?: { seconds: number } }[];
-
-    return videos
-        .filter((video) => video.id && video.id !== track.sourceId)
-        .filter((video) => matchesTitle(track.title, video.title?.text ?? ""))
-        .filter((video) => !track.duration || Math.abs((video.duration?.seconds ?? 0) - track.duration) <= constants.matchToleranceSeconds)
-        .map((video) => video.id!)
-        .slice(0, constants.youtubeAlternatives);
-};
-
-// Some songs are refused outright, so when the chosen video can't be fetched another upload of the same song stands in
-export const downloadYoutube = async (track: Track): Promise<Audio> => {
-    try {
-        return await downloadVideo(track.sourceId);
-    } catch (error) {
-        for (const videoId of await findAlternatives(track).catch(() => [])) {
-            try {
-                return await downloadVideo(videoId);
-            } catch {}
-        }
-        throw error;
-    }
 };

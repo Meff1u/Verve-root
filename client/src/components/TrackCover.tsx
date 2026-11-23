@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Music } from "lucide-react";
 import { Track } from "@verve/gen-shared";
+import { cachedCover, loadCover } from "../utils/coverLoader";
 import { pickGradient } from "../utils/format";
 
 const gradients = [
@@ -16,28 +17,40 @@ type Props = {
     size: "small" | "medium" | "large";
 };
 
-// Covers fade in once loaded; tracks without one (or whose image fails) get a gradient tile picked from the title
+// Each cover is a request to our server, so it's only asked for once its tile is about to scroll into view; until it
+// arrives (or if it fails) the tile shows a gradient picked from the title, and the cover fades in over it
 export const TrackCover = ({ track, size }: Props) => {
-    const [failed, setFailed] = useState(false);
+    const url = track?.coverUrl ?? "";
+    const tile = useRef<HTMLDivElement>(null);
+    const [fetched, setFetched] = useState({ url: "", src: "" });
     const [loaded, setLoaded] = useState(false);
+    const src = fetched.url === url ? fetched.src : cachedCover(url);
 
-    if (track?.coverUrl && !failed) {
-        return (
-            <img
-                className={`cover ${size}${loaded ? " loaded" : ""}`}
-                src={track.coverUrl}
-                alt=""
-                loading="lazy"
-                referrerPolicy="no-referrer"
-                onLoad={() => setLoaded(true)}
-                onError={() => setFailed(true)}
-            />
+    useEffect(() => {
+        if (!url || src || !tile.current) return;
+        let cancelled = false;
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (!entries.some((entry) => entry.isIntersecting)) return;
+                observer.disconnect();
+                loadCover(url).then((objectUrl) => !cancelled && setFetched({ url, src: objectUrl }), () => {});
+            },
+            { rootMargin: "200px" },
         );
+        observer.observe(tile.current);
+        return () => {
+            cancelled = true;
+            observer.disconnect();
+        };
+    }, [url, src]);
+
+    if (src) {
+        return <img className={`cover ${size}${loaded ? " loaded" : ""}`} src={src} alt="" onLoad={() => setLoaded(true)} />;
     }
 
     const [from, to] = pickGradient(track?.title ?? "", gradients);
     return (
-        <div className={`cover ${size} placeholder`} style={{ background: `linear-gradient(135deg, ${from}, ${to})` }} aria-hidden="true">
+        <div ref={tile} className={`cover ${size} placeholder`} style={{ background: `linear-gradient(135deg, ${from}, ${to})` }} aria-hidden="true">
             <Music />
         </div>
     );
