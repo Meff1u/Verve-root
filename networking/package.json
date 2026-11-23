@@ -1,0 +1,6 @@
+{
+  "name": "@verve/networking",
+  "scripts": {
+    "build": "rootsdk build proto"
+  }
+}

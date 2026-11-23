@@ -1,0 +1,32 @@
+{
+  "name": "@verve/app",
+  "description": "verve",
+  "version": "1.0.0",
+  "private": true,
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@rootsdk/client-app": "*",
+    "@rootsdk/server-app": "*",
+    "@verve/gen-client": "file:./networking/gen/client",
+    "@verve/gen-server": "file:./networking/gen/server",
+    "@verve/gen-shared": "file:./networking/gen/shared"
+  },
+  "devDependencies": {
+    "@rootsdk/dev-tools": "*",
+    "typescript": "^5.8.2",
+    "@types/node": "^22.10.2"
+  },
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "clean": "node clean.js"
+  },
+  "workspaces": {
+    "packages": [
+      "./networking",
+      "./server",
+      "./client"
+    ]
+  }
+}
