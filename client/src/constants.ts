@@ -6,6 +6,7 @@ export default {
     driftTolerance: 0.75,
     syncInterval: 1000,
     queuePreviewLength: 4,
+    mobileBreakpoint: 860,
     searchDelay: 400,
     resolveDelay: 350,
     importPreviewLength: 5,

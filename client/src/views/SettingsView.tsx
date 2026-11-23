@@ -37,7 +37,7 @@ export const SettingsView = ({ player, settings, onChange }: Props) => (
             </div>
         </div>
 
-        <section className="card settings-group" aria-labelledby="sound-title">
+        <section className="card settings-group sound" aria-labelledby="sound-title">
             <h2 id="sound-title">Sound</h2>
             <label className="setting">
                 <span className="setting-text">

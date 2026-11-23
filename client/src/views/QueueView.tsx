@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, Reorder, useDragControls } from "motion/react";
-import { ChevronDown, ChevronUp, GripVertical, Link2, Shuffle, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, GripVertical, Link2, MoreVertical, Shuffle, Trash2 } from "lucide-react";
 import { Track } from "@verve/gen-shared";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { TrackActionsSheet } from "../components/TrackActionsSheet";
 import { TrackRow } from "../components/TrackRow";
+import { useIsMobile } from "../hooks/useIsMobile";
 import { Player } from "../hooks/usePlayer";
 import { plural } from "../utils/format";
 import { spring, viewVariants } from "../utils/motion";
@@ -22,12 +24,14 @@ type ItemProps = {
     current: number;
     player: Player;
     nameOf: (userId: string) => string;
+    mobile: boolean;
     onRemove: (track: Track) => void;
+    onMore: (track: Track) => void;
     onDrop: () => void;
 };
 
 // Only the grip starts a drag, so scrolling the list on a phone never moves tracks by accident
-const QueueItem = ({ track, index, count, current, player, nameOf, onRemove, onDrop }: ItemProps) => {
+const QueueItem = ({ track, index, count, current, player, nameOf, mobile, onRemove, onMore, onDrop }: ItemProps) => {
     const controls = useDragControls();
 
     return (
@@ -56,17 +60,23 @@ const QueueItem = ({ track, index, count, current, player, nameOf, onRemove, onD
                     </span>
                 }
                 actions={
-                    <>
-                        <button className="icon-button small" onClick={() => player.move(track.id, index - 1)} disabled={index === 0} aria-label={`Move up: ${track.title}`}>
-                            <ChevronUp />
+                    mobile ? (
+                        <button className="icon-button" onClick={() => onMore(track)} aria-label={`More actions: ${track.title}`}>
+                            <MoreVertical />
                         </button>
-                        <button className="icon-button small" onClick={() => player.move(track.id, index + 1)} disabled={index === count - 1} aria-label={`Move down: ${track.title}`}>
-                            <ChevronDown />
-                        </button>
-                        <button className="icon-button small danger" onClick={() => onRemove(track)} aria-label={`Remove from queue: ${track.title}`}>
-                            <Trash2 />
-                        </button>
-                    </>
+                    ) : (
+                        <>
+                            <button className="icon-button small" onClick={() => player.move(track.id, index - 1)} disabled={index === 0} aria-label={`Move up: ${track.title}`}>
+                                <ChevronUp />
+                            </button>
+                            <button className="icon-button small" onClick={() => player.move(track.id, index + 1)} disabled={index === count - 1} aria-label={`Move down: ${track.title}`}>
+                                <ChevronDown />
+                            </button>
+                            <button className="icon-button small danger" onClick={() => onRemove(track)} aria-label={`Remove from queue: ${track.title}`}>
+                                <Trash2 />
+                            </button>
+                        </>
+                    )
                 }
             />
         </Reorder.Item>
@@ -119,21 +129,33 @@ export const QueueView = ({ player, nameOf, confirmRemove, onImport }: Props) =>
         setPending(null);
     };
 
+    // The actions sheet keeps the last track it showed while it slides away, like the confirm dialog
+    const mobile = useIsMobile();
+    const [sheetOpen, setSheetOpen] = useState(false);
+    const [sheetTrack, setSheetTrack] = useState<Track | null>(null);
+    const openSheet = (track: Track) => {
+        setSheetTrack(track);
+        setSheetOpen(true);
+    };
+
     const tracks = new Map(queue.map((track) => [track.id, track]));
+    const sheetIndex = sheetTrack ? order.indexOf(sheetTrack.id) : -1;
 
     return (
         <motion.div className="view queue-view" variants={viewVariants} initial="hidden" animate="visible" exit="exit">
             <div className="view-head">
                 <div>
                     <h1>Queue</h1>
-                    <p className="muted">{plural(queue.length, "track", "tracks")} · drag the grip or use the arrows to reorder</p>
+                    <p className="muted">
+                        {plural(queue.length, "track", "tracks")} · {mobile ? "drag the grip or tap ⋮ to reorder" : "drag the grip or use the arrows to reorder"}
+                    </p>
                 </div>
                 <div className="view-actions">
-                    <button className="button ghost" onClick={player.shuffle} disabled={queue.length - current < 3}>
-                        <Shuffle aria-hidden="true" /> Shuffle upcoming
+                    <button className="button ghost" onClick={player.shuffle} disabled={queue.length - current < 3} title="Shuffle upcoming tracks">
+                        <Shuffle aria-hidden="true" /> {mobile ? "Shuffle" : "Shuffle upcoming"}
                     </button>
                     <button className="button primary" onClick={onImport}>
-                        <Link2 aria-hidden="true" /> Import link
+                        <Link2 aria-hidden="true" /> {mobile ? "Import" : "Import link"}
                     </button>
                 </div>
             </div>
@@ -153,7 +175,9 @@ export const QueueView = ({ player, nameOf, confirmRemove, onImport }: Props) =>
                                     current={current}
                                     player={player}
                                     nameOf={nameOf}
+                                    mobile={mobile}
                                     onRemove={remove}
+                                    onMore={openSheet}
                                     onDrop={() => drop(id)}
                                 />
                             ) : null;
@@ -161,6 +185,17 @@ export const QueueView = ({ player, nameOf, confirmRemove, onImport }: Props) =>
                     </AnimatePresence>
                 </Reorder.Group>
             </section>
+
+            <TrackActionsSheet
+                track={sheetTrack}
+                open={sheetOpen}
+                index={sheetIndex}
+                count={order.length}
+                current={current}
+                player={player}
+                onRemove={remove}
+                onClose={() => setSheetOpen(false)}
+            />
 
             <ConfirmDialog
                 open={!!pending}

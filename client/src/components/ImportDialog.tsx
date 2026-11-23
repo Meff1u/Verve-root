@@ -122,7 +122,18 @@ export const ImportDialog = ({ open, initialUrl, player, onClose }: Props) => {
 
                 <label className="field">
                     <span>Track, album or playlist link</span>
-                    <input type="url" value={url} onChange={(event) => setUrl(event.target.value)} placeholder="Paste a link…" required autoFocus />
+                    <input
+                        type="url"
+                        inputMode="url"
+                        value={url}
+                        onChange={(event) => setUrl(event.target.value)}
+                        placeholder="Paste a link…"
+                        autoCapitalize="off"
+                        autoCorrect="off"
+                        spellCheck={false}
+                        required
+                        autoFocus
+                    />
                 </label>
 
                 <AnimatePresence mode="wait" initial={false}>

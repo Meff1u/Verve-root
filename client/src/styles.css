@@ -180,8 +180,10 @@ svg {
     transition: color 200ms var(--ease);
 }
 
-.nav-item:not(.active):hover {
-    background: rgba(139, 92, 246, 0.12);
+@media (hover: hover) {
+    .nav-item:not(.active):hover {
+        background: rgba(139, 92, 246, 0.12);
+    }
 }
 
 /* One element shared by all tabs; motion slides it to the active one */
@@ -241,9 +243,11 @@ svg {
     height: 22px;
 }
 
-.icon-button:not(:disabled):hover {
-    background: rgba(139, 92, 246, 0.16);
-    color: var(--text);
+@media (hover: hover) {
+    .icon-button:not(:disabled):hover {
+        background: rgba(139, 92, 246, 0.16);
+        color: var(--text);
+    }
 }
 
 .icon-button:not(:disabled):active {
@@ -282,9 +286,11 @@ svg {
     color: #f472b6;
 }
 
-.icon-button.danger:not(:disabled):hover {
-    color: var(--danger);
-    background: rgba(248, 113, 113, 0.12);
+@media (hover: hover) {
+    .icon-button.danger:not(:disabled):hover {
+        color: var(--danger);
+        background: rgba(248, 113, 113, 0.12);
+    }
 }
 
 .button {
@@ -310,8 +316,10 @@ svg {
     box-shadow: var(--glow);
 }
 
-.button.primary:not(:disabled):hover {
-    filter: brightness(1.1);
+@media (hover: hover) {
+    .button.primary:not(:disabled):hover {
+        filter: brightness(1.1);
+    }
 }
 
 .button.ghost {
@@ -319,8 +327,10 @@ svg {
     color: var(--icon);
 }
 
-.button.ghost:not(:disabled):hover {
-    background: rgba(139, 92, 246, 0.12);
+@media (hover: hover) {
+    .button.ghost:not(:disabled):hover {
+        background: rgba(139, 92, 246, 0.12);
+    }
 }
 
 .link-button {
@@ -338,8 +348,10 @@ svg {
     transition: transform 200ms var(--ease);
 }
 
-.link-button:hover svg {
-    transform: translateX(3px);
+@media (hover: hover) {
+    .link-button:hover svg {
+        transform: translateX(3px);
+    }
 }
 
 /* Toolbar */
@@ -501,8 +513,10 @@ svg {
     height: 26px;
 }
 
-.play-button:not(:disabled):hover {
-    filter: brightness(1.12);
+@media (hover: hover) {
+    .play-button:not(:disabled):hover {
+        filter: brightness(1.12);
+    }
 }
 
 .play-button:not(:disabled):active {
@@ -662,8 +676,10 @@ input[type="range"]::-moz-range-thumb {
     transition: background 200ms var(--ease);
 }
 
-.track-row:hover {
-    background: rgba(139, 92, 246, 0.08);
+@media (hover: hover) {
+    .track-row:hover {
+        background: rgba(139, 92, 246, 0.08);
+    }
 }
 
 .track-row.current {
@@ -778,9 +794,11 @@ input[type="range"]::-moz-range-thumb {
         border-color 200ms var(--ease);
 }
 
-.tile:hover {
-    transform: translateY(-2px);
-    border-color: rgba(139, 92, 246, 0.5);
+@media (hover: hover) {
+    .tile:hover {
+        transform: translateY(-2px);
+        border-color: rgba(139, 92, 246, 0.5);
+    }
 }
 
 .tile-text {
@@ -1043,8 +1061,10 @@ input[type="range"]::-moz-range-thumb {
     color: #fecaca;
 }
 
-.button.danger:hover {
-    background: rgba(248, 113, 113, 0.28);
+@media (hover: hover) {
+    .button.danger:hover {
+        background: rgba(248, 113, 113, 0.28);
+    }
 }
 
 .dialog-actions {
@@ -1098,36 +1118,300 @@ input[type="range"]::-moz-range-thumb {
         font-size: 0.75rem;
     }
 
+    /* Room at the bottom for the tab bar, plus the mini player when it shows */
     .content {
-        padding: 16px 16px 96px;
+        padding: calc(12px + env(safe-area-inset-top)) 14px calc(96px + env(safe-area-inset-bottom));
     }
 
+    .with-mini-player .content {
+        padding-bottom: calc(168px + env(safe-area-inset-bottom));
+    }
+
+    .view {
+        gap: 14px;
+    }
+
+    .view-head h1 {
+        font-size: 1.5rem;
+    }
+
+    .view-actions {
+        width: 100%;
+    }
+
+    .view-actions .button {
+        flex: 1;
+        justify-content: center;
+    }
+
+    .card {
+        padding: 14px;
+    }
+
+    /* Search on its own row, the source switch stretched below it with words next to the logos */
+    .toolbar {
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .search {
+        flex-basis: 100%;
+        min-height: 48px;
+    }
+
+    .toolbar-actions {
+        width: 100%;
+    }
+
+    .segmented {
+        flex: 1;
+    }
+
+    .segment {
+        flex: 1;
+        width: auto;
+        gap: 8px;
+        grid-auto-flow: column;
+        font-size: 0.85rem;
+        font-weight: 500;
+    }
+
+    .hint {
+        margin-top: 0;
+    }
+
+    /* Player card: big centred cover, centred text, controls spread across the width */
     .player-card {
         grid-template-columns: 1fr;
         justify-items: center;
         gap: 18px;
-        padding: 20px;
+        padding: 20px 16px;
+    }
+
+    .cover.large {
+        width: min(72vw, 300px);
+        height: min(72vw, 300px);
     }
 
     .player-main {
         width: 100%;
     }
 
+    /* The heart sits in the corner, so the centred title stays truly centred */
+    .player-titles {
+        text-align: center;
+        flex: 1;
+        padding: 0 48px;
+    }
+
+    .player-head > .icon-button {
+        position: absolute;
+        top: 0;
+        right: 0;
+    }
+
+    .player-meta {
+        justify-content: center;
+    }
+
     .player-controls {
         justify-content: center;
     }
 
-    .toolbar {
-        flex-wrap: wrap;
+    .transport {
+        width: 100%;
+        justify-content: space-between;
     }
 
-    .search {
-        flex-basis: 100%;
+    .play-button {
+        width: 72px;
+        height: 72px;
     }
 
     .track-duration {
         display: none;
     }
+
+    .track-row {
+        padding: 6px 4px;
+        gap: 4px;
+    }
+
+    .track-main {
+        gap: 12px;
+    }
+
+    .track-state:empty {
+        display: none;
+    }
+
+    .drag-handle {
+        width: 32px;
+    }
+
+    .result-row {
+        padding: 6px 4px;
+    }
+
+    .gallery {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+
+    .setting {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .setting:has(.switch) {
+        flex-direction: row;
+        align-items: center;
+    }
+
+    .setting-value,
+    .setting-value input {
+        width: 100%;
+    }
+
+    /* Mini player: sits on top of the tab bar on every tab except the player */
+    .mini-player {
+        position: fixed;
+        left: 8px;
+        right: 8px;
+        bottom: calc(76px + env(safe-area-inset-bottom));
+        z-index: 9;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 6px 6px 8px;
+        border-radius: 16px;
+        background: rgba(36, 22, 69, 0.96);
+        border: 1px solid var(--border);
+        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+        backdrop-filter: blur(12px);
+        overflow: hidden;
+    }
+
+    .mini-player::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        bottom: 0;
+        height: 3px;
+        width: var(--progress);
+        background: var(--gradient-progress);
+        transition: width 500ms linear;
+    }
+
+    .mini-main {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-height: 48px;
+        text-align: left;
+    }
+
+    .mini-main .track-text {
+        min-width: 0;
+    }
+
+    /* Dialogs become sheets anchored to the bottom edge */
+    .modal.sheet {
+        padding: 0;
+    }
+
+    .modal.sheet[open] {
+        place-items: end stretch;
+    }
+
+    .modal.sheet .modal-panel {
+        width: 100%;
+        max-height: 88dvh;
+        padding: 12px 18px calc(20px + env(safe-area-inset-bottom));
+        border-radius: 22px 22px 0 0;
+        border-bottom: 0;
+    }
+
+    .modal.sheet .dialog-actions .button {
+        flex: 1;
+        justify-content: center;
+        min-height: 48px;
+    }
+
+    .platforms {
+        min-height: 84px;
+        gap: 4px;
+    }
+
+    .platform-chip {
+        min-width: 84px;
+    }
+}
+
+/* Phones set volume with their own buttons, and iOS ignores volume set by a page anyway */
+@media (pointer: coarse) {
+    .volume,
+    .settings-group.sound {
+        display: none;
+    }
+}
+
+.sheet-grabber {
+    display: block;
+    width: 40px;
+    height: 5px;
+    margin: 0 auto 12px;
+    border-radius: 999px;
+    background: rgba(196, 181, 253, 0.35);
+}
+
+.sheet-track {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+}
+
+.sheet-track .track-text {
+    min-width: 0;
+}
+
+.sheet-actions {
+    display: grid;
+}
+
+.sheet-action {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-height: 52px;
+    padding: 0 8px;
+    border-radius: 12px;
+    text-align: left;
+    font-weight: 500;
+}
+
+.sheet-action svg {
+    width: 20px;
+    height: 20px;
+    color: var(--icon);
+}
+
+.sheet-action:active {
+    background: rgba(139, 92, 246, 0.16);
+}
+
+.sheet-action.danger,
+.sheet-action.danger svg {
+    color: var(--danger);
+}
+
+.segment-label {
+    white-space: nowrap;
 }
 
 /* Search, sources and import */
@@ -1159,9 +1443,14 @@ input[type="range"]::-moz-range-thumb {
     transition: opacity 200ms var(--ease);
 }
 
-.segment.active,
-.segment:hover {
+.segment.active {
     opacity: 1;
+}
+
+@media (hover: hover) {
+    .segment:hover {
+        opacity: 1;
+    }
 }
 
 .segment-highlight {
@@ -1210,8 +1499,10 @@ input[type="range"]::-moz-range-thumb {
     transition: background 200ms var(--ease);
 }
 
-.result-row:hover {
-    background: rgba(139, 92, 246, 0.1);
+@media (hover: hover) {
+    .result-row:hover {
+        background: rgba(139, 92, 246, 0.1);
+    }
 }
 
 .result-row .track-text {

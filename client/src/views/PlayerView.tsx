@@ -8,6 +8,7 @@ import { PlayerCard } from "../components/PlayerCard";
 import { TrackCover } from "../components/TrackCover";
 import { TrackRow } from "../components/TrackRow";
 import constants from "../constants";
+import { useIsMobile } from "../hooks/useIsMobile";
 import { Library } from "../hooks/useLibrary";
 import { Player } from "../hooks/usePlayer";
 import { useSearch } from "../hooks/useSearch";
@@ -28,6 +29,7 @@ type Props = {
 };
 
 export const PlayerView = ({ player, library, nameOf, onImport, onShowQueue }: Props) => {
+    const mobile = useIsMobile();
     const [query, setQuery] = useState("");
     const [source, setSource] = useState(Source.YOUTUBE);
     // Remembers what was added from these results, so its button turns into a check instead of adding twice
@@ -72,8 +74,12 @@ export const PlayerView = ({ player, library, nameOf, onImport, onShowQueue }: P
                         type="search"
                         value={query}
                         onChange={(event) => setQuery(event.target.value)}
-                        placeholder="Search songs, artists, albums… or paste a link"
+                        placeholder={mobile ? "Search or paste a link" : "Search songs, artists, albums… or paste a link"}
                         aria-label="Search songs or paste a YouTube, SoundCloud or Spotify link"
+                        enterKeyHint="search"
+                        autoCapitalize="off"
+                        autoCorrect="off"
+                        spellCheck={false}
                     />
                     <AnimatePresence>
                         {search.searching && (
@@ -106,6 +112,8 @@ export const PlayerView = ({ player, library, nameOf, onImport, onShowQueue }: P
                             >
                                 {source === item.source && <motion.span className="segment-highlight" layoutId="search-source" transition={spring} />}
                                 <BrandIcon icon={item.icon} />
+                                {/* On a phone the row has room for words, which say more than two small logos */}
+                                {mobile && <span className="segment-label">{item.label}</span>}
                             </button>
                         ))}
                     </div>

@@ -12,6 +12,8 @@ import "@fontsource/poppins/latin-ext-500.css";
 import "@fontsource/poppins/latin-ext-600.css";
 import "@fontsource/poppins/latin-ext-700.css";
 import { ImportDialog } from "./components/ImportDialog";
+import { MiniPlayer } from "./components/MiniPlayer";
+import { useIsMobile } from "./hooks/useIsMobile";
 import { Sidebar, Tab, tabs } from "./components/Sidebar";
 import { useLibrary } from "./hooks/useLibrary";
 import { useNicknames } from "./hooks/useNicknames";
@@ -33,6 +35,7 @@ const App = () => {
     const { settings, update } = useSettings();
     const nameOf = useNicknames(player.state?.queue.map((track) => track.addedBy) ?? []);
     const [tab, setTab] = useState(tabFromHash);
+    const mobile = useIsMobile();
     // null while the import dialog is closed; otherwise the link it opens with (empty when opened from the button)
     const [importUrl, setImportUrl] = useState<string | null>(null);
     const importing = importUrl !== null;
@@ -46,7 +49,7 @@ const App = () => {
     // reducedMotion="user" turns every motion animation into an instant change when the system asks for less movement
     return (
         <MotionConfig reducedMotion="user" transition={spring}>
-            <div className="app">
+            <div className={`app${mobile && tab !== "player" && player.currentTrack ? " with-mini-player" : ""}`}>
                 <Sidebar active={tab} onChange={setTab} connected={!!player.state} listeners={player.state?.listeners ?? 0} />
 
                 <main className="content">
@@ -75,6 +78,8 @@ const App = () => {
                         {tab === "settings" && <SettingsView key="settings" player={player} settings={settings} onChange={update} />}
                     </AnimatePresence>
                 </main>
+
+                <AnimatePresence>{mobile && tab !== "player" && player.currentTrack && <MiniPlayer key="mini" player={player} onOpen={() => setTab("player")} />}</AnimatePresence>
 
                 <ImportDialog open={importing} initialUrl={importUrl ?? ""} player={player} onClose={() => setImportUrl(null)} />
             </div>
