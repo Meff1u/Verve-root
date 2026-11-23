@@ -6,13 +6,14 @@ import {
     GetAudioRequest,
     GetAudioResponse,
     GetStateResponse,
-    ImportLinkRequest,
     MoveRequest,
     PlayRequest,
     PlayerError,
     PlayerState,
     RemoveRequest,
     RepeatMode,
+    ResolveLinkRequest,
+    ResolveLinkResponse,
     SearchRequest,
     SearchResponse,
     SeekRequest,
@@ -25,7 +26,7 @@ import {
 import { getAudioChunk, prepareAudio, retainAudio } from "./audioCache";
 import constants from "./constants";
 import { importLink, search } from "./sources";
-import { Audio, emptyTrack, makeTrack } from "./sources/track";
+import { Audio, emptyTrack, LinkContents, makeTrack } from "./sources/track";
 
 // One player per community: each community gets its own server instance, so module state is that community's player.
 // current is -1 while idle (nothing loaded, or the queue played to the end)
@@ -191,7 +192,8 @@ export class PlayerService extends PlayerServiceBase {
         }
     }
 
-    async importLink(request: ImportLinkRequest, client: Client): Promise<StateResponse> {
+    // Only reads what the link points to; the client shows it and adds the tracks with AddTracks
+    async resolveLink(request: ResolveLinkRequest): Promise<ResolveLinkResponse> {
         let url: URL;
         try {
             url = new URL(request.url.trim());
@@ -202,22 +204,22 @@ export class PlayerService extends PlayerServiceBase {
         const lookup = importLink(url);
         if (!lookup) throw fail(PlayerError.UNSUPPORTED_LINK, "Only YouTube, SoundCloud and Spotify links are supported");
 
-        let tracks: Track[];
+        let contents: LinkContents;
         try {
-            tracks = await lookup;
+            contents = await lookup;
         } catch (error) {
             throw fail(PlayerError.SOURCE_FAILED, "Couldn't read that link", error);
         }
-        if (!tracks.length) throw fail(PlayerError.SOURCE_FAILED, "Nothing playable was found at that link");
+        if (!contents.tracks.length) throw fail(PlayerError.SOURCE_FAILED, "Nothing playable was found at that link");
 
-        return this.enqueue(
-            tracks.slice(0, constants.maxImportTracks).map((track) => ({ ...track, id: randomUUID(), addedBy: client.userId })),
-            client,
-        );
+        return { title: contents.title.slice(0, constants.maxTitleLength), tracks: contents.tracks.slice(0, constants.maxImportTracks) };
     }
 
     async addTracks(request: AddTracksRequest, client: Client): Promise<StateResponse> {
-        const tracks = request.tracks.filter((track) => sources.includes(track.source) && track.sourceId).map((track) => fromClient(track, client.userId));
+        const tracks = request.tracks
+            .slice(0, constants.maxImportTracks)
+            .filter((track) => sources.includes(track.source) && track.sourceId)
+            .map((track) => fromClient(track, client.userId));
         if (!tracks.length) throw fail(PlayerError.TRACK_NOT_FOUND, "Nothing to add");
         return this.enqueue(tracks, client);
     }

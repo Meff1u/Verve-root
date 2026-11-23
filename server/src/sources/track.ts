@@ -1,6 +1,12 @@
 import { Source, Track } from "@verve/gen-shared";
 import constants from "../constants";
 
+// What a link points to: the playlist or album name (empty for a single track) and its tracks
+export type LinkContents = {
+    title: string;
+    tracks: Track[];
+};
+
 export type Audio = {
     data: Buffer;
     mimeType: string;

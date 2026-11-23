@@ -1,13 +1,13 @@
 import { Source, Track } from "@verve/gen-shared";
 import { downloadSoundcloud, importSoundcloud, isSoundcloudLink, searchSoundcloud } from "./soundcloud";
 import { downloadSpotify, importSpotify, isSpotifyLink } from "./spotify";
-import { Audio } from "./track";
+import { Audio, LinkContents } from "./track";
 import { downloadYoutube, importYoutube, isYoutubeLink, searchYoutube } from "./youtube";
 
 export const search = (query: string, source: Source) => (source === Source.SOUNDCLOUD ? searchSoundcloud(query) : searchYoutube(query));
 
 // null means the link isn't from a platform we know, which the caller reports differently from a failed lookup
-export const importLink = (url: URL): Promise<Track[]> | null => {
+export const importLink = (url: URL): Promise<LinkContents> | null => {
     if (isYoutubeLink(url)) return importYoutube(url);
     if (isSoundcloudLink(url)) return importSoundcloud(url);
     if (isSpotifyLink(url)) return importSpotify(url);

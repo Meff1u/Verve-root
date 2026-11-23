@@ -2,7 +2,7 @@ import vm from "vm";
 import { Innertube, Platform } from "youtubei.js";
 import { Source, Track } from "@verve/gen-shared";
 import constants from "../constants";
-import { Audio, collect, isPlayableLength, makeTrack, matchesTitle } from "./track";
+import { Audio, collect, isPlayableLength, LinkContents, makeTrack, matchesTitle } from "./track";
 
 type Thumbnail = { url: string; width: number };
 
@@ -53,14 +53,14 @@ export const searchYoutube = async (query: string): Promise<Track[]> => {
 // Accepts youtube.com, music.youtube.com, m.youtube.com and youtu.be links to a video or a playlist
 export const isYoutubeLink = (url: URL) => /(^|\.)youtube\.com$|^youtu\.be$/.test(url.hostname);
 
-export const importYoutube = async (url: URL): Promise<Track[]> => {
+export const importYoutube = async (url: URL): Promise<LinkContents> => {
     const yt = await getSession();
     const videoId = url.hostname === "youtu.be" ? url.pathname.slice(1) : url.searchParams.get("v");
     const listId = url.searchParams.get("list");
 
     if (videoId) {
         const info = await yt.getBasicInfo(videoId);
-        return [
+        const tracks = [
             makeTrack({
                 source: Source.YOUTUBE,
                 sourceId: videoId,
@@ -70,12 +70,13 @@ export const importYoutube = async (url: URL): Promise<Track[]> => {
                 duration: info.basic_info.duration ?? 0,
                 coverUrl: bestThumbnail(info.basic_info.thumbnail as Thumbnail[]),
             }),
-        ].filter(isPlayableLength);
+        ];
+        return { title: "", tracks: tracks.filter(isPlayableLength) };
     }
 
-    if (!listId) return [];
+    if (!listId) return { title: "", tracks: [] };
     const playlist = await yt.getPlaylist(listId);
-    return playlist.videos
+    const tracks = playlist.videos
         .map((video) => {
             const item = video as unknown as { id: string; title: { text?: string }; author?: { name: string }; duration?: { seconds: number }; thumbnails?: Thumbnail[] };
             return makeTrack({
@@ -89,6 +90,7 @@ export const importYoutube = async (url: URL): Promise<Track[]> => {
             });
         })
         .filter((track) => track.sourceId && isPlayableLength(track));
+    return { title: playlist.info.title ?? "", tracks };
 };
 
 // YouTube refuses different clients at different times, so each is tried in turn, and once more with a fresh session

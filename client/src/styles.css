@@ -411,7 +411,7 @@ svg {
     position: relative;
     overflow: hidden;
     display: grid;
-    grid-template-columns: auto 1fr auto;
+    grid-template-columns: auto 1fr;
     align-items: center;
     gap: 28px;
     padding: 24px;
@@ -612,41 +612,6 @@ input[type="range"]::-moz-range-thumb {
 .cover.small svg {
     width: 20px;
     height: 20px;
-}
-
-/* Visualizer */
-
-.visualizer {
-    align-self: end;
-    display: flex;
-    align-items: flex-end;
-    gap: 4px;
-    height: 96px;
-}
-
-.visualizer span {
-    width: 7px;
-    height: calc(var(--height) * 100%);
-    border-radius: 3px;
-    background: linear-gradient(0deg, #8b5cf6, #c4b5fd);
-    opacity: 0.5;
-    transform-origin: bottom;
-    transform: scaleY(0.25);
-    transition: transform 400ms var(--ease);
-}
-
-.visualizer.active span {
-    opacity: 0.9;
-    animation: bounce 1s var(--delay) ease-in-out infinite alternate;
-}
-
-@keyframes bounce {
-    from {
-        transform: scaleY(0.2);
-    }
-    to {
-        transform: scaleY(1);
-    }
 }
 
 /* Track lists */
@@ -968,23 +933,57 @@ input[type="range"]::-moz-range-thumb {
     font-weight: 600;
 }
 
-.dialog {
-    width: min(480px, calc(100vw - 32px));
+/* The <dialog> itself is an invisible full-screen layer; the backdrop and panel inside it carry the look and the motion */
+.modal {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    max-height: none;
+    margin: 0;
+    padding: 16px;
+    border: 0;
+    background: transparent;
+    color: var(--text);
+    overflow: hidden;
+}
+
+.modal[open] {
+    display: grid;
+    place-items: center;
+}
+
+.modal::backdrop {
+    background: transparent;
+}
+
+.modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(8, 4, 20, 0.72);
+    backdrop-filter: blur(6px);
+}
+
+.modal-panel {
+    position: relative;
+    width: min(500px, 100%);
+    max-height: calc(100dvh - 32px);
+    overflow-y: auto;
     padding: 24px;
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    background: var(--card);
-    color: var(--text);
+    background: linear-gradient(180deg, var(--card-raised), var(--card));
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55), var(--glow);
 }
 
-.dialog::backdrop {
-    background: rgba(8, 4, 20, 0.7);
-    backdrop-filter: blur(4px);
-}
-
-.dialog form {
+.dialog-body {
     display: grid;
     gap: 16px;
+}
+
+.dialog-body h2 {
+    font-size: 1.25rem;
 }
 
 .dialog-head {
@@ -1026,8 +1025,26 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .field-error {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     color: var(--danger);
     font-size: 0.9rem;
+}
+
+.field-error svg {
+    width: 18px;
+    height: 18px;
+}
+
+.button.danger {
+    background: rgba(248, 113, 113, 0.16);
+    border: 1px solid rgba(248, 113, 113, 0.5);
+    color: #fecaca;
+}
+
+.button.danger:hover {
+    background: rgba(248, 113, 113, 0.28);
 }
 
 .dialog-actions {
@@ -1039,14 +1056,6 @@ input[type="range"]::-moz-range-thumb {
 /* Responsive: the sidebar becomes a bottom tab bar and the player card stacks */
 
 @media (max-width: 1100px) {
-    .player-card {
-        grid-template-columns: auto 1fr;
-    }
-
-    .visualizer {
-        display: none;
-    }
-
     .cover.large {
         width: 180px;
         height: 180px;
@@ -1230,25 +1239,112 @@ input[type="range"]::-moz-range-thumb {
     }
 }
 
-.import-examples {
-    display: grid;
-    gap: 8px;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    color: var(--muted);
-    font-size: 0.85rem;
+/* Import dialog: supported sites, the detected one, and what the link holds */
+
+.platforms {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    min-height: 92px;
+    align-items: center;
 }
 
-.import-examples li {
+.platform-chip {
+    display: grid;
+    justify-items: center;
+    gap: 6px;
+    min-width: 92px;
+    color: var(--muted);
+    font-size: 0.8rem;
+}
+
+.platform-icon {
+    display: grid;
+    place-items: center;
+    width: 52px;
+    height: 52px;
+    border-radius: 16px;
+    background: rgba(15, 10, 31, 0.6);
+    border: 1px solid var(--border);
+    transition:
+        box-shadow 300ms var(--ease),
+        border-color 300ms var(--ease);
+}
+
+.platform-icon .brand-icon {
+    width: 26px;
+    height: 26px;
+}
+
+.platforms.detected .platform-chip {
+    color: var(--text);
+    font-weight: 600;
+}
+
+.platforms.detected .platform-icon {
+    border-color: rgba(196, 181, 253, 0.6);
+    box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.18), 0 0 30px rgba(139, 92, 246, 0.45);
+}
+
+.import-status {
+    min-height: 48px;
+}
+
+.fetching {
     display: flex;
     align-items: center;
     gap: 10px;
+    color: var(--icon);
 }
 
-.import-examples .brand-icon {
+.link-preview {
+    display: grid;
+    gap: 10px;
+    padding: 12px;
+    border-radius: 12px;
+    background: rgba(15, 10, 31, 0.5);
+    border: 1px solid var(--border);
+}
+
+.link-preview.single {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.link-preview.single .track-text {
+    flex: 1;
+}
+
+.link-preview-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.link-preview-title svg {
     width: 18px;
     height: 18px;
+    color: var(--icon);
+}
+
+.link-preview ul {
+    display: grid;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.link-preview li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.link-preview .cover.small {
+    width: 40px;
+    height: 40px;
 }
 
 .source-badge {

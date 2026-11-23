@@ -60,13 +60,7 @@ export const SettingsView = ({ player, settings, onChange }: Props) => (
         </section>
 
         <section className="card settings-group" aria-labelledby="look-title">
-            <h2 id="look-title">Look and behavior</h2>
-            <Toggle
-                label="Visualizer"
-                description="Animated bars next to the player. They stay still when reduced motion is on in your system."
-                checked={settings.visualizer}
-                onChange={(checked) => onChange("visualizer", checked)}
-            />
+            <h2 id="look-title">Queue</h2>
             <Toggle
                 label="Confirm removing"
                 description="Ask before a track is removed from the queue."

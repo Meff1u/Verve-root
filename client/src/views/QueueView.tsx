@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, Reorder, useDragControls } from "motion/react";
 import { ChevronDown, ChevronUp, GripVertical, Link2, Shuffle, Trash2 } from "lucide-react";
 import { Track } from "@verve/gen-shared";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { TrackRow } from "../components/TrackRow";
 import { Player } from "../hooks/usePlayer";
 import { plural } from "../utils/format";
@@ -102,9 +103,20 @@ export const QueueView = ({ player, nameOf, confirmRemove, onImport }: Props) =>
         if (from !== to && to !== -1) player.move(trackId, to);
     };
 
+    // With confirmation on, the track waits here while the dialog asks; the last one asked about is kept for the
+    // closing animation, so the text doesn't vanish while the dialog fades out
+    const [pending, setPending] = useState<Track | null>(null);
+    const [asked, setAsked] = useState<Track | null>(null);
+
     const remove = (track: Track) => {
-        if (confirmRemove && !confirm(`Remove "${track.title}" from the queue?`)) return;
-        player.remove(track.id);
+        if (!confirmRemove) return player.remove(track.id);
+        setAsked(track);
+        setPending(track);
+    };
+
+    const confirmPending = () => {
+        if (pending) player.remove(pending.id);
+        setPending(null);
     };
 
     const tracks = new Map(queue.map((track) => [track.id, track]));
@@ -149,6 +161,15 @@ export const QueueView = ({ player, nameOf, confirmRemove, onImport }: Props) =>
                     </AnimatePresence>
                 </Reorder.Group>
             </section>
+
+            <ConfirmDialog
+                open={!!pending}
+                title="Remove from queue?"
+                message={`"${asked?.title ?? ""}" will be removed for everyone listening.`}
+                confirmLabel="Remove"
+                onConfirm={confirmPending}
+                onCancel={() => setPending(null)}
+            />
         </motion.div>
     );
 };

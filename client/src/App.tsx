@@ -33,16 +33,15 @@ const App = () => {
     const { settings, update } = useSettings();
     const nameOf = useNicknames(player.state?.queue.map((track) => track.addedBy) ?? []);
     const [tab, setTab] = useState(tabFromHash);
-    const [importing, setImporting] = useState(false);
+    // null while the import dialog is closed; otherwise the link it opens with (empty when opened from the button)
+    const [importUrl, setImportUrl] = useState<string | null>(null);
+    const importing = importUrl !== null;
 
     useEffect(() => {
         history.replaceState(null, "", `#${tab}`);
     }, [tab]);
 
-    const openImport = () => {
-        player.clearError();
-        setImporting(true);
-    };
+    const openImport = (url = "") => setImportUrl(url);
 
     // reducedMotion="user" turns every motion animation into an instant change when the system asks for less movement
     return (
@@ -69,15 +68,15 @@ const App = () => {
 
                     <AnimatePresence mode="wait" initial={false}>
                         {tab === "player" && (
-                            <PlayerView key="player" player={player} library={library} nameOf={nameOf} visualizer={settings.visualizer} onImport={openImport} onShowQueue={() => setTab("queue")} />
+                            <PlayerView key="player" player={player} library={library} nameOf={nameOf} onImport={openImport} onShowQueue={() => setTab("queue")} />
                         )}
-                        {tab === "queue" && <QueueView key="queue" player={player} nameOf={nameOf} confirmRemove={settings.confirmRemove} onImport={openImport} />}
+                        {tab === "queue" && <QueueView key="queue" player={player} nameOf={nameOf} confirmRemove={settings.confirmRemove} onImport={() => openImport()} />}
                         {tab === "library" && <LibraryView key="library" player={player} library={library} />}
                         {tab === "settings" && <SettingsView key="settings" player={player} settings={settings} onChange={update} />}
                     </AnimatePresence>
                 </main>
 
-                <ImportDialog open={importing} player={player} onClose={() => setImporting(false)} />
+                <ImportDialog open={importing} initialUrl={importUrl ?? ""} player={player} onClose={() => setImportUrl(null)} />
             </div>
         </MotionConfig>
     );

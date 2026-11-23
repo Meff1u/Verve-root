@@ -7,11 +7,14 @@ export default {
     syncInterval: 1000,
     queuePreviewLength: 4,
     searchDelay: 400,
+    resolveDelay: 350,
+    importPreviewLength: 5,
     chunkRetries: 4,
+    // At most ~6 chunk requests a second (~1.2 MB/s), leaving room under Root's 10 requests/second for everything else
+    chunkInterval: 160,
     chunkRetryDelay: 600,
     maxShownErrorLength: 120,
     defaultSettings: {
-        visualizer: true,
         confirmRemove: false,
     },
 };

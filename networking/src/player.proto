@@ -67,9 +67,15 @@ message SearchResponse {
     repeated Track results = 1;
 }
 
-// A YouTube, SoundCloud or Spotify link to a track, album or playlist
-message ImportLinkRequest {
+// A YouTube, SoundCloud or Spotify link to a track, album or playlist; the answer only describes what's there,
+// so the import dialog can show it before anything is added
+message ResolveLinkRequest {
     string url = 1;
+}
+
+message ResolveLinkResponse {
+    repeated Track tracks = 1;
+    string title = 2;
 }
 
 message AddTracksRequest {
@@ -133,7 +139,7 @@ message StateChangedEvent {
 service PlayerService {
     rpc GetState(GetStateRequest) returns (GetStateResponse);
     rpc Search(SearchRequest) returns (SearchResponse);
-    rpc ImportLink(ImportLinkRequest) returns (StateResponse);
+    rpc ResolveLink(ResolveLinkRequest) returns (ResolveLinkResponse);
     rpc AddTracks(AddTracksRequest) returns (StateResponse);
     rpc GetAudio(GetAudioRequest) returns (GetAudioResponse);
     rpc Remove(RemoveRequest) returns (StateResponse);

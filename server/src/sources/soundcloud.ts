@@ -1,6 +1,6 @@
 import Soundcloud, { SoundcloudTrack } from "soundcloud.ts";
 import { Source, Track } from "@verve/gen-shared";
-import { Audio, fetchBuffer, isPlayableLength, makeTrack } from "./track";
+import { Audio, fetchBuffer, isPlayableLength, LinkContents, makeTrack } from "./track";
 
 const soundcloud = new Soundcloud();
 
@@ -38,13 +38,15 @@ export const searchSoundcloud = async (query: string): Promise<Track[]> => {
 
 export const isSoundcloudLink = (url: URL) => /(^|\.)soundcloud\.com$/.test(url.hostname);
 
-export const importSoundcloud = async (url: URL): Promise<Track[]> => {
+export const importSoundcloud = async (url: URL): Promise<LinkContents> => {
     const link = `https://soundcloud.com${url.pathname}`;
     if (url.pathname.includes("/sets/")) {
         const playlist = await soundcloud.playlists.get(link);
-        return playlist.tracks.filter((track) => track.title && playableTranscoding(track)).map(toTrack).filter(isPlayableLength);
+        const tracks = playlist.tracks.filter((track) => track.title && playableTranscoding(track)).map(toTrack).filter(isPlayableLength);
+        return { title: playlist.title ?? "", tracks };
     }
-    return [await soundcloud.tracks.get(link)].filter((track) => playableTranscoding(track)).map(toTrack).filter(isPlayableLength);
+    const tracks = [await soundcloud.tracks.get(link)].filter((track) => playableTranscoding(track)).map(toTrack).filter(isPlayableLength);
+    return { title: "", tracks };
 };
 
 // HLS is turned into one file without ffmpeg: AAC streams are fragmented MP4 (init segment + parts), MP3 ones just concatenate

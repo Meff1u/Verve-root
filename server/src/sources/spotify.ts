@@ -1,7 +1,7 @@
 import type { SpotifyUrlInfo } from "spotify-url-info";
 import { Source, Track } from "@verve/gen-shared";
 import constants from "../constants";
-import { Audio, isPlayableLength, makeTrack, matchesTitle } from "./track";
+import { Audio, isPlayableLength, LinkContents, makeTrack, matchesTitle } from "./track";
 import { downloadYoutube, searchYoutube } from "./youtube";
 
 // The package's type file declares its export as a type only, so the function itself comes in through require
@@ -10,12 +10,12 @@ const spotify: SpotifyUrlInfo = require("spotify-url-info")(fetch);
 export const isSpotifyLink = (url: URL) => url.hostname === "open.spotify.com";
 
 // Spotify's public embed pages give names, artists and durations for tracks, albums and playlists without an API key
-export const importSpotify = async (url: URL): Promise<Track[]> => {
+export const importSpotify = async (url: URL): Promise<LinkContents> => {
     const link = `https://open.spotify.com${url.pathname.replace(/^\/intl-[a-z]+/, "")}`;
-    const [tracks, preview] = await Promise.all([spotify.getTracks(link), spotify.getPreview(link).catch(() => null)]);
-    const single = tracks.length === 1;
+    const [items, preview] = await Promise.all([spotify.getTracks(link), spotify.getPreview(link).catch(() => null)]);
+    const single = items.length === 1;
 
-    return tracks
+    const tracks = items
         .map((track) =>
             makeTrack({
                 source: Source.SPOTIFY,
@@ -29,6 +29,7 @@ export const importSpotify = async (url: URL): Promise<Track[]> => {
             }),
         )
         .filter(isPlayableLength);
+    return { title: single ? "" : (preview?.title ?? ""), tracks };
 };
 
 // Spotify has no audio for us, so the track is looked up on YouTube Music: only results with the same title and

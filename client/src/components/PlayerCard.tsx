@@ -8,7 +8,6 @@ import { spring, tap } from "../utils/motion";
 import { SeekBar } from "./SeekBar";
 import { SourceBadge } from "./SourceBadge";
 import { TrackCover } from "./TrackCover";
-import { Visualizer } from "./Visualizer";
 
 const repeatLabels: Record<RepeatMode, string> = {
     [RepeatMode.OFF]: "Repeat off",
@@ -20,10 +19,9 @@ type Props = {
     player: Player;
     library: Library;
     nameOf: (userId: string) => string;
-    visualizer: boolean;
 };
 
-export const PlayerCard = ({ player, library, nameOf, visualizer }: Props) => {
+export const PlayerCard = ({ player, library, nameOf }: Props) => {
     const track = player.currentTrack;
     const playing = !!player.state?.playing;
     const hasQueue = !!player.state?.queue.length;
@@ -181,8 +179,6 @@ export const PlayerCard = ({ player, library, nameOf, visualizer }: Props) => {
                     </div>
                 </div>
             </div>
-
-            {visualizer && <Visualizer active={playing && loading === null} />}
         </section>
     );
 };

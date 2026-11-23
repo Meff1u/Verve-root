@@ -223,7 +223,6 @@ export const usePlayer = () => {
         getPosition,
         unblock: () => audio.play().then(() => setBlocked(false), () => setBlocked(true)),
         addTracks: (tracks: Track[]) => run(() => playerServiceClient.addTracks({ tracks })),
-        importLink: (url: string) => run(() => playerServiceClient.importLink({ url })),
         remove: (trackId: string) => run(() => playerServiceClient.remove({ trackId })),
         play: (trackId = "") => run(() => playerServiceClient.play({ trackId })),
         pause: () => run(() => playerServiceClient.pause({})),

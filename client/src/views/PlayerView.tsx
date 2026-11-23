@@ -1,7 +1,7 @@
 import { FormEvent, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { ArrowRight, Check, Link2, ListMusic, Plus, Search, X } from "lucide-react";
-import { siSoundcloud, siSpotify, siYoutubemusic } from "simple-icons";
+import { siSoundcloud, siYoutubemusic } from "simple-icons";
 import { Source, Track } from "@verve/gen-shared";
 import { BrandIcon } from "../components/BrandIcon";
 import { PlayerCard } from "../components/PlayerCard";
@@ -23,19 +23,17 @@ type Props = {
     player: Player;
     library: Library;
     nameOf: (userId: string) => string;
-    visualizer: boolean;
-    onImport: () => void;
+    onImport: (url?: string) => void;
     onShowQueue: () => void;
 };
 
-export const PlayerView = ({ player, library, nameOf, visualizer, onImport, onShowQueue }: Props) => {
+export const PlayerView = ({ player, library, nameOf, onImport, onShowQueue }: Props) => {
     const [query, setQuery] = useState("");
     const [source, setSource] = useState(Source.YOUTUBE);
     // Remembers what was added from these results, so its button turns into a check instead of adding twice
     const [added, setAdded] = useState<Set<string>>(new Set());
-    const [importing, setImporting] = useState(false);
 
-    // A pasted link isn't searched; Enter imports it straight away
+    // A pasted link isn't searched; it opens the import dialog, which shows what's behind it before adding
     const pastedLink = isUrl(query);
     const search = useSearch(pastedLink ? "" : query, source);
     const showResults = query.trim() !== "" && !pastedLink;
@@ -44,13 +42,11 @@ export const PlayerView = ({ player, library, nameOf, visualizer, onImport, onSh
     const current = player.state?.current ?? -1;
     const preview = queue.map((track, index) => ({ track, index })).slice(Math.max(current, 0), Math.max(current, 0) + constants.queuePreviewLength);
 
-    const submit = async (event: FormEvent) => {
+    const submit = (event: FormEvent) => {
         event.preventDefault();
-        if (!pastedLink || importing) return;
-
-        setImporting(true);
-        if (await player.importLink(query.trim())) setQuery("");
-        setImporting(false);
+        if (!pastedLink) return;
+        onImport(query.trim());
+        setQuery("");
     };
 
     const add = async (track: Track) => {
@@ -80,10 +76,10 @@ export const PlayerView = ({ player, library, nameOf, visualizer, onImport, onSh
                         aria-label="Search songs or paste a YouTube, SoundCloud or Spotify link"
                     />
                     <AnimatePresence>
-                        {(search.searching || importing) && (
+                        {search.searching && (
                             <motion.span key="spinner" className="spinner" initial={{ opacity: 0, scale: 0.5 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.5 }} aria-hidden="true" />
                         )}
-                        {pastedLink && !importing && (
+                        {pastedLink && (
                             <motion.button key="import" type="submit" className="button primary small" initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 8 }}>
                                 <Link2 aria-hidden="true" /> Import
                             </motion.button>
@@ -113,10 +109,7 @@ export const PlayerView = ({ player, library, nameOf, visualizer, onImport, onSh
                             </button>
                         ))}
                     </div>
-                    <motion.button className="icon-button round platform" onClick={onImport} aria-label="Import from Spotify" title="Import a Spotify track, album or playlist" whileTap={tap}>
-                        <BrandIcon icon={siSpotify} />
-                    </motion.button>
-                    <motion.button className="icon-button round primary" onClick={onImport} aria-label="Import from a link" title="Import from a YouTube, SoundCloud or Spotify link" whileTap={tap}>
+                    <motion.button className="icon-button round primary" onClick={() => onImport()} aria-label="Import from a link" title="Import from a YouTube, SoundCloud or Spotify link" whileTap={tap}>
                         <Link2 />
                     </motion.button>
                 </div>
@@ -180,7 +173,7 @@ export const PlayerView = ({ player, library, nameOf, visualizer, onImport, onSh
                     </motion.section>
                 ) : (
                     <motion.div key="player" className="view" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.22 }}>
-                        <PlayerCard player={player} library={library} nameOf={nameOf} visualizer={visualizer} />
+                        <PlayerCard player={player} library={library} nameOf={nameOf} />
 
                         <section className="card queue-preview" aria-labelledby="queue-preview-title">
                             <div className="section-head">
