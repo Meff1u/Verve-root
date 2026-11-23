@@ -1,0 +1,87 @@
+syntax = "proto3";
+
+import "rootsdk/types.proto";
+
+message Track {
+    string id = 1;
+    string url = 2;
+    string title = 3;
+    string added_by = 4;
+}
+
+// The whole shared player in one message: position is in seconds as of updated_at (server clock, ms since epoch),
+// so every client can extrapolate where playback is right now without the server ticking
+message PlayerState {
+    repeated Track queue = 1;
+    int32 current = 2;
+    bool playing = 3;
+    double position = 4;
+    double updated_at = 5;
+}
+
+enum PlayerError {
+    PLAYER_ERROR_UNSPECIFIED = 0;
+    PLAYER_ERROR_INVALID_URL = 1;
+    PLAYER_ERROR_TRACK_NOT_FOUND = 2;
+    PLAYER_ERROR_QUEUE_FULL = 3;
+}
+
+message GetStateRequest {}
+
+message GetStateResponse {
+    PlayerState state = 1;
+    double server_time = 2;
+}
+
+message AddRequest {
+    string url = 1;
+    string title = 2;
+}
+
+message RemoveRequest {
+    string track_id = 1;
+}
+
+// An empty track_id resumes the current track
+message PlayRequest {
+    string track_id = 1;
+}
+
+message PauseRequest {}
+
+message SeekRequest {
+    double position = 1;
+}
+
+message NextRequest {}
+
+message PreviousRequest {}
+
+message ShuffleRequest {}
+
+message TrackEndedRequest {
+    string track_id = 1;
+}
+
+message StateResponse {
+    PlayerState state = 1;
+}
+
+message StateChangedEvent {
+    PlayerState state = 1;
+}
+
+service PlayerService {
+    rpc GetState(GetStateRequest) returns (GetStateResponse);
+    rpc Add(AddRequest) returns (StateResponse);
+    rpc Remove(RemoveRequest) returns (StateResponse);
+    rpc Play(PlayRequest) returns (StateResponse);
+    rpc Pause(PauseRequest) returns (StateResponse);
+    rpc Seek(SeekRequest) returns (StateResponse);
+    rpc Next(NextRequest) returns (StateResponse);
+    rpc Previous(PreviousRequest) returns (StateResponse);
+    rpc Shuffle(ShuffleRequest) returns (StateResponse);
+    rpc TrackEnded(TrackEndedRequest) returns (StateResponse);
+
+    rpc BroadcastStateChanged(StateChangedEvent) returns (rootsdk.Void);
+}
