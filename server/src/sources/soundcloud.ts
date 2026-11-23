@@ -1,6 +1,7 @@
 import Soundcloud, { SoundcloudTrack } from "soundcloud.ts";
 import { Source, Track } from "@verve/gen-shared";
-import { Audio, fetchBuffer, isPlayableLength, LinkContents, makeTrack } from "./track";
+import constants from "../constants";
+import { Audio, fetchBuffer, isPlayableLength, LinkContents, makeTrack, matchesTitle } from "./track";
 
 const soundcloud = new Soundcloud();
 
@@ -58,6 +59,28 @@ const downloadHls = async (playlistUrl: string) => {
     const parts: Buffer[] = [];
     for (const url of init ? [init, ...segments] : segments) parts.push(await fetchBuffer(url));
     return Buffer.concat(parts);
+};
+
+// Stands in when another platform has no audio for us: only uploads with the same title and about the same length
+// count, closest length first, so a track is skipped rather than swapped for a different song
+export const downloadSoundcloudMatch = async (track: Track): Promise<Audio> => {
+    const candidates = (await searchSoundcloud(`${track.artist} ${track.title}`))
+        .slice(0, constants.soundcloudMatchCandidates)
+        .filter((candidate) => matchesTitle(track.title, candidate.title))
+        .filter((candidate) => !track.duration || Math.abs(candidate.duration - track.duration) <= constants.matchToleranceSeconds)
+        .sort((a, b) => Math.abs(a.duration - track.duration) - Math.abs(b.duration - track.duration));
+    if (!candidates.length) throw new Error(`No SoundCloud match for ${track.artist} - ${track.title}`);
+
+    let lastError: unknown;
+    for (const match of candidates.slice(0, 2)) {
+        try {
+            const audio = await downloadSoundcloud(match.sourceId);
+            return { ...audio, details: { coverUrl: track.coverUrl || match.coverUrl, album: track.album } };
+        } catch (error) {
+            lastError = error;
+        }
+    }
+    throw lastError;
 };
 
 export const downloadSoundcloud = async (trackId: string): Promise<Audio> => {

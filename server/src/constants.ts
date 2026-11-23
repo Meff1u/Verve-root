@@ -15,6 +15,7 @@ export default {
     youtubeAlternatives: 3,
     matchToleranceSeconds: 15,
     spotifyMatchCandidates: 5,
+    soundcloudMatchCandidates: 8,
     // How long a new track waits at 0:00 for listeners to download it before starting anyway
     bufferTimeoutMs: 15000,
     // Pressing "previous" later than this many seconds into a track restarts it instead of going back
