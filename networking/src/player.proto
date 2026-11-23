@@ -2,7 +2,15 @@ syntax = "proto3";
 
 import "rootsdk/types.proto";
 
-// artist, album, year, cover_url and duration stay empty/0 until a source (YouTube, Spotify...) can provide them
+// Spotify has no audio of its own: its tracks are matched to YouTube Music when they're about to play
+enum Source {
+    SOURCE_UNSPECIFIED = 0;
+    SOURCE_YOUTUBE = 1;
+    SOURCE_SOUNDCLOUD = 2;
+    SOURCE_SPOTIFY = 3;
+}
+
+// url is the track's page on its platform; the audio itself always comes through the server (GetAudio)
 message Track {
     string id = 1;
     string url = 2;
@@ -13,6 +21,8 @@ message Track {
     int32 year = 7;
     string cover_url = 8;
     double duration = 9;
+    Source source = 10;
+    string source_id = 11;
 }
 
 enum RepeatMode {
@@ -35,9 +45,10 @@ message PlayerState {
 
 enum PlayerError {
     PLAYER_ERROR_UNSPECIFIED = 0;
-    PLAYER_ERROR_INVALID_URL = 1;
+    PLAYER_ERROR_UNSUPPORTED_LINK = 1;
     PLAYER_ERROR_TRACK_NOT_FOUND = 2;
     PLAYER_ERROR_QUEUE_FULL = 3;
+    PLAYER_ERROR_SOURCE_FAILED = 4;
 }
 
 message GetStateRequest {}
@@ -47,10 +58,34 @@ message GetStateResponse {
     double server_time = 2;
 }
 
-message AddRequest {
+message SearchRequest {
+    string query = 1;
+    Source source = 2;
+}
+
+message SearchResponse {
+    repeated Track results = 1;
+}
+
+// A YouTube, SoundCloud or Spotify link to a track, album or playlist
+message ImportLinkRequest {
     string url = 1;
-    string title = 2;
-    string artist = 3;
+}
+
+message AddTracksRequest {
+    repeated Track tracks = 1;
+}
+
+// Audio travels in chunks small enough for Root's message limit; total tells the client how many to ask for
+message GetAudioRequest {
+    string track_id = 1;
+    int32 chunk = 2;
+}
+
+message GetAudioResponse {
+    bytes data = 1;
+    int32 total = 2;
+    string mime_type = 3;
 }
 
 message RemoveRequest {
@@ -97,7 +132,10 @@ message StateChangedEvent {
 
 service PlayerService {
     rpc GetState(GetStateRequest) returns (GetStateResponse);
-    rpc Add(AddRequest) returns (StateResponse);
+    rpc Search(SearchRequest) returns (SearchResponse);
+    rpc ImportLink(ImportLinkRequest) returns (StateResponse);
+    rpc AddTracks(AddTracksRequest) returns (StateResponse);
+    rpc GetAudio(GetAudioRequest) returns (GetAudioResponse);
     rpc Remove(RemoveRequest) returns (StateResponse);
     rpc Move(MoveRequest) returns (StateResponse);
     rpc Play(PlayRequest) returns (StateResponse);

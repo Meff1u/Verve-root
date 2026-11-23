@@ -2,24 +2,37 @@ import { randomUUID } from "crypto";
 import { Client, ClientEvent, RootServerException, rootServer } from "@rootsdk/server-app";
 import { PlayerServiceBase } from "@verve/gen-server";
 import {
-    AddRequest,
+    AddTracksRequest,
+    GetAudioRequest,
+    GetAudioResponse,
     GetStateResponse,
+    ImportLinkRequest,
     MoveRequest,
     PlayRequest,
     PlayerError,
     PlayerState,
     RemoveRequest,
     RepeatMode,
+    SearchRequest,
+    SearchResponse,
     SeekRequest,
     SetRepeatRequest,
+    Source,
     StateResponse,
+    Track,
     TrackEndedRequest,
 } from "@verve/gen-shared";
+import { getAudioChunk, prepareAudio, retainAudio } from "./audioCache";
 import constants from "./constants";
+import { importLink, search } from "./sources";
+import { Audio, emptyTrack, makeTrack } from "./sources/track";
 
 // One player per community: each community gets its own server instance, so module state is that community's player.
 // current is -1 while idle (nothing loaded, or the queue played to the end)
 const state: PlayerState = { queue: [], current: -1, playing: false, position: 0, updatedAt: Date.now(), repeat: RepeatMode.OFF, listeners: 0 };
+
+// Counts downloads that failed in a row, so a queue where nothing can be fetched stops instead of skipping forever
+let failedInARow = 0;
 
 const positionNow = () => (state.playing ? state.position + (Date.now() - state.updatedAt) / 1000 : state.position);
 
@@ -40,10 +53,9 @@ const goTo = (index: number, playing: boolean) => {
 };
 
 // With repeat-all the queue wraps around instead of going idle after the last track
-const goToNext = (playing: boolean) => {
-    const last = state.current >= state.queue.length - 1;
-    goTo(last && state.repeat === RepeatMode.ALL ? 0 : state.current + 1, playing);
-};
+const nextIndex = () => (state.current >= state.queue.length - 1 && state.repeat === RepeatMode.ALL ? 0 : state.current + 1);
+
+const goToNext = (playing: boolean) => goTo(nextIndex(), playing);
 
 const findTrack = (trackId: string) => {
     const index = state.queue.findIndex((track) => track.id === trackId);
@@ -51,33 +63,44 @@ const findTrack = (trackId: string) => {
     return index;
 };
 
-// Without a title the file name stands in, e.g. ".../My%20Song.mp3" becomes "My Song"
-const titleFrom = (url: URL, title: string) => {
-    const fileName = decodeURIComponent(url.pathname.split("/").pop() || "").replace(/\.[a-z0-9]+$/i, "");
-    return (title.trim() || fileName || url.hostname).slice(0, constants.maxTitleLength);
+const fail = (code: PlayerError, message: string, error?: unknown) => {
+    if (error) console.error(message, error);
+    return new RootServerException(code, message);
 };
 
-const emptyTrack = { artist: "", album: "", year: 0, coverUrl: "", duration: 0 };
+const sources = [Source.YOUTUBE, Source.SOUNDCLOUD, Source.SPOTIFY];
 
-const parseUrl = (value: string) => {
-    try {
-        const url = new URL(value.trim());
-        if (url.protocol === "http:" || url.protocol === "https:") return url;
-    } catch {}
+// Tracks from clients come from search results, but they're rebuilt field by field so nothing unexpected gets stored
+const fromClient = (track: Track, userId: string) =>
+    makeTrack({
+        id: randomUUID(),
+        addedBy: userId,
+        source: track.source,
+        sourceId: track.sourceId.slice(0, 200),
+        url: track.url.slice(0, 500),
+        title: track.title,
+        artist: track.artist,
+        album: track.album.slice(0, constants.maxTitleLength),
+        year: track.year,
+        duration: Math.max(0, track.duration),
+        coverUrl: track.coverUrl.startsWith("https://") ? track.coverUrl.slice(0, 500) : "",
+    });
 
-    throw new RootServerException(PlayerError.INVALID_URL, "Only http(s) links are supported");
-};
+// Gives up waiting after a while; the download keeps going and the track simply starts a little late for everyone
+const waitAtMost = (promise: Promise<unknown>, ms: number) => Promise.race([promise.catch(() => {}), new Promise((resolve) => setTimeout(resolve, ms))]);
 
 export class PlayerService extends PlayerServiceBase {
-    // A restart (deploy, crash) brings the queue back paused where it was, rather than guessing how far it got
+    // A restart (deploy, crash) brings the queue back paused where it was, rather than guessing how far it got.
+    // Tracks saved before sources existed (plain file links) can't be played anymore and are dropped
     async load() {
         try {
             const saved = await rootServer.dataStore.appData.get<PlayerState>(constants.stateKey);
             if (!saved) return;
 
-            // Saved before newer fields existed, a state may lack them; the defaults above fill the gaps
-            Object.assign(state, saved, { queue: saved.queue.map((track) => ({ ...emptyTrack, ...track })) });
-            setPlayback(false, saved.position);
+            const playing = saved.queue[saved.current];
+            const queue = saved.queue.filter((track) => sources.includes(track.source)).map((track) => ({ ...emptyTrack, ...track }));
+            Object.assign(state, saved, { queue, current: playing ? queue.findIndex((track) => track.id === playing.id) : -1 });
+            setPlayback(false, state.current === -1 ? 0 : saved.position);
         } catch (error) {
             console.error("Loading player state failed:", error);
         }
@@ -98,7 +121,58 @@ export class PlayerService extends PlayerServiceBase {
     private commit(client?: Client): StateResponse {
         rootServer.dataStore.appData.set({ key: constants.stateKey, value: state }).catch((error) => console.error("Saving player state failed:", error));
         this.broadcastStateChanged({ state }, "all", client);
+        this.prefetch();
         return { state };
+    }
+
+    // Keeps the playing and the next track downloaded, so changing tracks doesn't wait for YouTube or SoundCloud.
+    // A current track that can't be downloaded is skipped, otherwise everyone would sit in silence
+    private prefetch() {
+        const current = state.queue[state.current];
+        const next = state.queue[nextIndex()];
+        retainAudio([current?.id, next?.id].filter((id): id is string => !!id));
+
+        if (next && next !== current) prepareAudio(next).then((audio) => this.applyDetails(next, audio), () => {});
+        if (!current) return;
+
+        prepareAudio(current).then(
+            (audio) => {
+                failedInARow = 0;
+                this.applyDetails(current, audio);
+            },
+            () => {
+                if (state.queue[state.current]?.id !== current.id) return;
+                failedInARow++;
+                if (failedInARow >= state.queue.length) setPlayback(false, 0);
+                else goToNext(state.playing);
+                this.commit();
+            },
+        );
+    }
+
+    // Fills only what the queue didn't know yet, e.g. the cover of a Spotify track found on YouTube Music
+    private applyDetails(track: Track, audio: Audio) {
+        const missing = Object.entries(audio.details ?? {}).filter(([key, value]) => value && !track[key as keyof Track]);
+        if (!missing.length || !state.queue.includes(track)) return;
+
+        Object.assign(track, Object.fromEntries(missing));
+        this.commit();
+    }
+
+    // Adding to an idle player starts the first new track like a jukebox, after giving the server a moment to fetch it,
+    // so listeners don't miss the opening seconds
+    private async enqueue(tracks: Track[], client: Client): Promise<StateResponse> {
+        const room = constants.maxQueueLength - state.queue.length;
+        if (room <= 0) throw fail(PlayerError.QUEUE_FULL, "The queue is full");
+
+        const added = tracks.slice(0, room);
+        state.queue.push(...added);
+
+        if (state.current === -1) {
+            await waitAtMost(prepareAudio(added[0]), constants.startWaitMs);
+            if (state.current === -1 && state.queue.includes(added[0])) goTo(state.queue.indexOf(added[0]), true);
+        }
+        return this.commit(client);
     }
 
     async getState(): Promise<GetStateResponse> {
@@ -106,22 +180,55 @@ export class PlayerService extends PlayerServiceBase {
         return { state, serverTime: Date.now() };
     }
 
-    async add(request: AddRequest, client: Client): Promise<StateResponse> {
-        const url = parseUrl(request.url);
-        if (state.queue.length >= constants.maxQueueLength) throw new RootServerException(PlayerError.QUEUE_FULL, "The queue is full");
+    async search(request: SearchRequest): Promise<SearchResponse> {
+        const query = request.query.trim().slice(0, constants.maxQueryLength);
+        if (!query) return { results: [] };
 
-        state.queue.push({
-            ...emptyTrack,
-            id: randomUUID(),
-            url: url.href,
-            title: titleFrom(url, request.title),
-            artist: request.artist.trim().slice(0, constants.maxTitleLength),
-            addedBy: client.userId,
-        });
+        try {
+            return { results: await search(query, request.source) };
+        } catch (error) {
+            throw fail(PlayerError.SOURCE_FAILED, "Search failed, try again in a moment", error);
+        }
+    }
 
-        // Adding to an idle player starts the new track straight away, like a jukebox
-        if (state.current === -1) goTo(state.queue.length - 1, true);
-        return this.commit(client);
+    async importLink(request: ImportLinkRequest, client: Client): Promise<StateResponse> {
+        let url: URL;
+        try {
+            url = new URL(request.url.trim());
+        } catch {
+            throw fail(PlayerError.UNSUPPORTED_LINK, "That isn't a link");
+        }
+
+        const lookup = importLink(url);
+        if (!lookup) throw fail(PlayerError.UNSUPPORTED_LINK, "Only YouTube, SoundCloud and Spotify links are supported");
+
+        let tracks: Track[];
+        try {
+            tracks = await lookup;
+        } catch (error) {
+            throw fail(PlayerError.SOURCE_FAILED, "Couldn't read that link", error);
+        }
+        if (!tracks.length) throw fail(PlayerError.SOURCE_FAILED, "Nothing playable was found at that link");
+
+        return this.enqueue(
+            tracks.slice(0, constants.maxImportTracks).map((track) => ({ ...track, id: randomUUID(), addedBy: client.userId })),
+            client,
+        );
+    }
+
+    async addTracks(request: AddTracksRequest, client: Client): Promise<StateResponse> {
+        const tracks = request.tracks.filter((track) => sources.includes(track.source) && track.sourceId).map((track) => fromClient(track, client.userId));
+        if (!tracks.length) throw fail(PlayerError.TRACK_NOT_FOUND, "Nothing to add");
+        return this.enqueue(tracks, client);
+    }
+
+    async getAudio(request: GetAudioRequest): Promise<GetAudioResponse> {
+        const track = state.queue[findTrack(request.trackId)];
+        try {
+            return await getAudioChunk(track, request.chunk);
+        } catch (error) {
+            throw fail(PlayerError.SOURCE_FAILED, "This track couldn't be downloaded", error);
+        }
     }
 
     async remove(request: RemoveRequest, client: Client): Promise<StateResponse> {

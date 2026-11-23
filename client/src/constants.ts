@@ -6,6 +6,10 @@ export default {
     driftTolerance: 0.75,
     syncInterval: 1000,
     queuePreviewLength: 4,
+    searchDelay: 400,
+    chunkRetries: 4,
+    chunkRetryDelay: 600,
+    maxShownErrorLength: 120,
     defaultSettings: {
         visualizer: true,
         confirmRemove: false,

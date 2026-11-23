@@ -5,5 +5,10 @@
   "scripts": {
     "build": "tsc",
     "server": "rootsdk start devhost --project-folder=../"
+  },
+  "dependencies": {
+    "soundcloud.ts": "^0.7.4",
+    "spotify-url-info": "^3.3.3",
+    "youtubei.js": "^18.3.0"
   }
 }

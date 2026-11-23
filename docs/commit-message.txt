@@ -1,19 +1,17 @@
-feat: redesigned player with tabs, favorites and English UI
-
-Client
-- Sidebar layout with Player, Queue, Library and Settings tabs; becomes a
-  bottom tab bar on narrow screens. Tab is kept in the URL hash.
-- Player card with cover, artist, album/year, seek bar, shuffle, repeat
-  (off/queue/track), volume with mute and a decorative visualizer.
-- Queue view with drag-and-drop and move up/down buttons, remove and shuffle.
-- Library with per-user favorites; Settings with volume, visualizer and
-  remove confirmation stored on the device.
-- Verve palette and PNG logo, bundled Poppins font and SVG icons so nothing
-  loads from the network. All UI text in English.
+feat: search and import from YouTube, SoundCloud and Spotify with smooth animations
 
 Server
-- Repeat mode, track moving and a live listener count in PlayerState.
-- Optional track metadata (artist, album, year, cover, duration).
-- LibraryService storing favorites per user in the key-value store.
+- Sources: YouTube Music search/import/download (youtubei.js, player script run
+  in an isolated vm), SoundCloud search/import with HLS joined without ffmpeg and
+  DRM tracks filtered out, Spotify import matched to YouTube Music for playback.
+- Audio is downloaded once on the server, cached for the current and next track
+  and streamed to clients through GetAudio in 200 KB chunks.
+- Search, ImportLink and AddTracks replace adding direct file links; tracks that
+  can't be downloaded are skipped.
 
-Docs: add project notes 01-05.
+Client
+- Live search with a YouTube Music / SoundCloud switch, import dialog for links,
+  chunked audio loading with progress and next-track prefetch.
+- Motion-based animations: view transitions, sliding tab highlight, cover and
+  title transitions, animated controls, staggered lists, drag-to-reorder queue
+  and a frame-smooth seek bar; all respect reduced motion.

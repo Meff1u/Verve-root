@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Music } from "lucide-react";
 import { Track } from "@verve/gen-shared";
 import { pickGradient } from "../utils/format";
@@ -15,9 +16,24 @@ type Props = {
     size: "small" | "medium" | "large";
 };
 
-// Direct links have no artwork yet, so they get a gradient tile picked from the title instead of an empty box
+// Covers fade in once loaded; tracks without one (or whose image fails) get a gradient tile picked from the title
 export const TrackCover = ({ track, size }: Props) => {
-    if (track?.coverUrl) return <img className={`cover ${size}`} src={track.coverUrl} alt="" loading="lazy" />;
+    const [failed, setFailed] = useState(false);
+    const [loaded, setLoaded] = useState(false);
+
+    if (track?.coverUrl && !failed) {
+        return (
+            <img
+                className={`cover ${size}${loaded ? " loaded" : ""}`}
+                src={track.coverUrl}
+                alt=""
+                loading="lazy"
+                referrerPolicy="no-referrer"
+                onLoad={() => setLoaded(true)}
+                onError={() => setFailed(true)}
+            />
+        );
+    }
 
     const [from, to] = pickGradient(track?.title ?? "", gradients);
     return (

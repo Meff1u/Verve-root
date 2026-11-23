@@ -1,5 +1,7 @@
 import { CSSProperties } from "react";
+import { motion } from "motion/react";
 import { Player } from "../hooks/usePlayer";
+import { viewVariants } from "../utils/motion";
 import { Settings } from "../hooks/useSettings";
 import packageJson from "../../package.json";
 
@@ -27,7 +29,7 @@ const Toggle = ({ label, description, checked, onChange }: ToggleProps) => (
 );
 
 export const SettingsView = ({ player, settings, onChange }: Props) => (
-    <div className="view settings-view">
+    <motion.div className="view settings-view" variants={viewVariants} initial="hidden" animate="visible" exit="exit">
         <div className="view-head">
             <div>
                 <h1>Settings</h1>
@@ -77,7 +79,8 @@ export const SettingsView = ({ player, settings, onChange }: Props) => (
             <h2 id="about-title">About</h2>
             <p className="muted">
                 Verve v{packageJson.version} · a shared music player for Root communities. Everyone listens on their own device while the queue and playback position stay in sync.
+                Search uses YouTube Music and SoundCloud; Spotify links are matched to YouTube Music.
             </p>
         </section>
-    </div>
+    </motion.div>
 );

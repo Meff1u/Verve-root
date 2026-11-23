@@ -1,16 +1,35 @@
-import { CSSProperties, useState } from "react";
+import { CSSProperties, useEffect, useState } from "react";
 import { formatTime } from "../utils/format";
 
 type Props = {
-    position: number;
+    getPosition: () => number;
     duration: number;
+    playing: boolean;
     disabled: boolean;
     onSeek: (seconds: number) => void;
 };
 
-export const SeekBar = ({ position, duration, disabled, onSeek }: Props) => {
+export const SeekBar = ({ getPosition, duration, playing, disabled, onSeek }: Props) => {
+    const [position, setPosition] = useState(0);
     // While the thumb is held it shows the dragged spot; the seek is sent once, on release
     const [dragging, setDragging] = useState<number | null>(null);
+
+    // Follows the audio every frame while playing, so the bar glides instead of jumping four times a second
+    useEffect(() => {
+        let frame = 0;
+        const tick = () => {
+            setPosition(getPosition());
+            if (playing) frame = requestAnimationFrame(tick);
+        };
+        tick();
+        const timer = playing ? 0 : window.setInterval(tick, 500);
+
+        return () => {
+            cancelAnimationFrame(frame);
+            clearInterval(timer);
+        };
+    }, [playing, getPosition]);
+
     const shown = dragging ?? Math.min(position, duration || 0);
     const progress = duration ? (shown / duration) * 100 : 0;
 
