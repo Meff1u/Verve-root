@@ -1,0 +1,19 @@
+feat: redesigned player with tabs, favorites and English UI
+
+Client
+- Sidebar layout with Player, Queue, Library and Settings tabs; becomes a
+  bottom tab bar on narrow screens. Tab is kept in the URL hash.
+- Player card with cover, artist, album/year, seek bar, shuffle, repeat
+  (off/queue/track), volume with mute and a decorative visualizer.
+- Queue view with drag-and-drop and move up/down buttons, remove and shuffle.
+- Library with per-user favorites; Settings with volume, visualizer and
+  remove confirmation stored on the device.
+- Verve palette and PNG logo, bundled Poppins font and SVG icons so nothing
+  loads from the network. All UI text in English.
+
+Server
+- Repeat mode, track moving and a live listener count in PlayerState.
+- Optional track metadata (artist, album, year, cover, duration).
+- LibraryService storing favorites per user in the key-value store.
+
+Docs: add project notes 01-05.

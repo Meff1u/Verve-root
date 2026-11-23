@@ -1,14 +1,17 @@
 import { randomUUID } from "crypto";
-import { Client, RootServerException, rootServer } from "@rootsdk/server-app";
+import { Client, ClientEvent, RootServerException, rootServer } from "@rootsdk/server-app";
 import { PlayerServiceBase } from "@verve/gen-server";
 import {
     AddRequest,
     GetStateResponse,
+    MoveRequest,
     PlayRequest,
     PlayerError,
     PlayerState,
     RemoveRequest,
+    RepeatMode,
     SeekRequest,
+    SetRepeatRequest,
     StateResponse,
     TrackEndedRequest,
 } from "@verve/gen-shared";
@@ -16,7 +19,7 @@ import constants from "./constants";
 
 // One player per community: each community gets its own server instance, so module state is that community's player.
 // current is -1 while idle (nothing loaded, or the queue played to the end)
-const state: PlayerState = { queue: [], current: -1, playing: false, position: 0, updatedAt: Date.now() };
+const state: PlayerState = { queue: [], current: -1, playing: false, position: 0, updatedAt: Date.now(), repeat: RepeatMode.OFF, listeners: 0 };
 
 const positionNow = () => (state.playing ? state.position + (Date.now() - state.updatedAt) / 1000 : state.position);
 
@@ -36,6 +39,12 @@ const goTo = (index: number, playing: boolean) => {
     setPlayback(playing, 0);
 };
 
+// With repeat-all the queue wraps around instead of going idle after the last track
+const goToNext = (playing: boolean) => {
+    const last = state.current >= state.queue.length - 1;
+    goTo(last && state.repeat === RepeatMode.ALL ? 0 : state.current + 1, playing);
+};
+
 const findTrack = (trackId: string) => {
     const index = state.queue.findIndex((track) => track.id === trackId);
     if (index === -1) throw new RootServerException(PlayerError.TRACK_NOT_FOUND, "Track is not in the queue");
@@ -47,6 +56,8 @@ const titleFrom = (url: URL, title: string) => {
     const fileName = decodeURIComponent(url.pathname.split("/").pop() || "").replace(/\.[a-z0-9]+$/i, "");
     return (title.trim() || fileName || url.hostname).slice(0, constants.maxTitleLength);
 };
+
+const emptyTrack = { artist: "", album: "", year: 0, coverUrl: "", duration: 0 };
 
 const parseUrl = (value: string) => {
     try {
@@ -64,11 +75,23 @@ export class PlayerService extends PlayerServiceBase {
             const saved = await rootServer.dataStore.appData.get<PlayerState>(constants.stateKey);
             if (!saved) return;
 
-            Object.assign(state, saved);
+            // Saved before newer fields existed, a state may lack them; the defaults above fill the gaps
+            Object.assign(state, saved, { queue: saved.queue.map((track) => ({ ...emptyTrack, ...track })) });
             setPlayback(false, saved.position);
         } catch (error) {
             console.error("Loading player state failed:", error);
         }
+    }
+
+    // Members with the app open; only the server sees everyone attach and leave, so it keeps the count
+    watchListeners() {
+        const update = () => {
+            state.listeners = rootServer.clients.getClients().length;
+            this.broadcastStateChanged({ state }, "all");
+        };
+
+        rootServer.clients.on(ClientEvent.UserAttached, update);
+        rootServer.clients.on(ClientEvent.UserDetached, update);
     }
 
     // Saves and tells every other device; the caller gets the same state back in its response
@@ -79,6 +102,7 @@ export class PlayerService extends PlayerServiceBase {
     }
 
     async getState(): Promise<GetStateResponse> {
+        state.listeners = rootServer.clients.getClients().length;
         return { state, serverTime: Date.now() };
     }
 
@@ -86,7 +110,14 @@ export class PlayerService extends PlayerServiceBase {
         const url = parseUrl(request.url);
         if (state.queue.length >= constants.maxQueueLength) throw new RootServerException(PlayerError.QUEUE_FULL, "The queue is full");
 
-        state.queue.push({ id: randomUUID(), url: url.href, title: titleFrom(url, request.title), addedBy: client.userId });
+        state.queue.push({
+            ...emptyTrack,
+            id: randomUUID(),
+            url: url.href,
+            title: titleFrom(url, request.title),
+            artist: request.artist.trim().slice(0, constants.maxTitleLength),
+            addedBy: client.userId,
+        });
 
         // Adding to an idle player starts the new track straight away, like a jukebox
         if (state.current === -1) goTo(state.queue.length - 1, true);
@@ -100,6 +131,18 @@ export class PlayerService extends PlayerServiceBase {
         // Removing the playing track moves on to whatever slid into its place
         if (index < state.current) state.current--;
         else if (index === state.current) goTo(index, state.playing);
+        return this.commit(client);
+    }
+
+    // The playing track keeps playing wherever it lands; current follows it to its new index
+    async move(request: MoveRequest, client: Client): Promise<StateResponse> {
+        const from = findTrack(request.trackId);
+        const to = Math.min(Math.max(request.toIndex, 0), state.queue.length - 1);
+        const playing = state.queue[state.current];
+
+        const [track] = state.queue.splice(from, 1);
+        state.queue.splice(to, 0, track);
+        if (playing) state.current = state.queue.indexOf(playing);
         return this.commit(client);
     }
 
@@ -125,7 +168,7 @@ export class PlayerService extends PlayerServiceBase {
     }
 
     async next(_request: unknown, client: Client): Promise<StateResponse> {
-        if (state.current !== -1) goTo(state.current + 1, state.playing);
+        if (state.current !== -1) goToNext(state.playing);
         return this.commit(client);
     }
 
@@ -146,11 +189,17 @@ export class PlayerService extends PlayerServiceBase {
         return this.commit(client);
     }
 
+    async setRepeat(request: SetRepeatRequest, client: Client): Promise<StateResponse> {
+        state.repeat = request.repeat in RepeatMode ? request.repeat : RepeatMode.OFF;
+        return this.commit(client);
+    }
+
     // Every listening device reports the end, so only the first report for the playing track counts
     async trackEnded(request: TrackEndedRequest, client: Client): Promise<StateResponse> {
         if (!state.playing || state.queue[state.current]?.id !== request.trackId) return { state };
 
-        goTo(state.current + 1, true);
+        if (state.repeat === RepeatMode.ONE) setPlayback(true, 0);
+        else goToNext(true);
         return this.commit(client);
     }
 }

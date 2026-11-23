@@ -1,13 +1,19 @@
 import { useEffect, useRef, useState } from "react";
 import { RootServerException } from "@rootsdk/client-app";
 import { playerServiceClient, PlayerServiceClientEvent } from "@verve/gen-client";
-import { PlayerError, PlayerState, StateChangedEvent, StateResponse } from "@verve/gen-shared";
+import { PlayerError, PlayerState, RepeatMode, StateChangedEvent, StateResponse } from "@verve/gen-shared";
 import constants from "../constants";
 
 const errorMessages: Record<number, string> = {
     [PlayerError.INVALID_URL]: "That link isn't an http(s) address",
     [PlayerError.TRACK_NOT_FOUND]: "That track is no longer in the queue",
     [PlayerError.QUEUE_FULL]: "The queue is full",
+};
+
+const nextRepeat: Record<RepeatMode, RepeatMode> = {
+    [RepeatMode.OFF]: RepeatMode.ALL,
+    [RepeatMode.ALL]: RepeatMode.ONE,
+    [RepeatMode.ONE]: RepeatMode.OFF,
 };
 
 const loadVolume = () => {
@@ -167,13 +173,13 @@ export const usePlayer = () => {
         volume,
         setVolume,
         unblock: () => audio.play().then(() => setBlocked(false), () => setBlocked(true)),
-        add: async (url: string, title: string) => {
+        add: async (url: string, title = "", artist = "") => {
             // Checked here too, because the local dev host reports the server's own error codes as unhandled (-3)
             if (!/^https?:\/\//i.test(url.trim())) {
                 setError(errorMessages[PlayerError.INVALID_URL]);
                 return false;
             }
-            return run(() => playerServiceClient.add({ url, title }));
+            return run(() => playerServiceClient.add({ url, title, artist }));
         },
         remove: (trackId: string) => run(() => playerServiceClient.remove({ trackId })),
         play: (trackId = "") => run(() => playerServiceClient.play({ trackId })),
@@ -182,5 +188,8 @@ export const usePlayer = () => {
         next: () => run(() => playerServiceClient.next({})),
         previous: () => run(() => playerServiceClient.previous({})),
         shuffle: () => run(() => playerServiceClient.shuffle({})),
+        move: (trackId: string, toIndex: number) => run(() => playerServiceClient.move({ trackId, toIndex })),
+        cycleRepeat: () => run(() => playerServiceClient.setRepeat({ repeat: nextRepeat[stateRef.current?.repeat ?? RepeatMode.OFF] })),
+        clearError: () => setError(null),
     };
 };

@@ -2,11 +2,23 @@ syntax = "proto3";
 
 import "rootsdk/types.proto";
 
+// artist, album, year, cover_url and duration stay empty/0 until a source (YouTube, Spotify...) can provide them
 message Track {
     string id = 1;
     string url = 2;
     string title = 3;
     string added_by = 4;
+    string artist = 5;
+    string album = 6;
+    int32 year = 7;
+    string cover_url = 8;
+    double duration = 9;
+}
+
+enum RepeatMode {
+    REPEAT_MODE_OFF = 0;
+    REPEAT_MODE_ALL = 1;
+    REPEAT_MODE_ONE = 2;
 }
 
 // The whole shared player in one message: position is in seconds as of updated_at (server clock, ms since epoch),
@@ -17,6 +29,8 @@ message PlayerState {
     bool playing = 3;
     double position = 4;
     double updated_at = 5;
+    RepeatMode repeat = 6;
+    int32 listeners = 7;
 }
 
 enum PlayerError {
@@ -36,10 +50,16 @@ message GetStateResponse {
 message AddRequest {
     string url = 1;
     string title = 2;
+    string artist = 3;
 }
 
 message RemoveRequest {
     string track_id = 1;
+}
+
+message MoveRequest {
+    string track_id = 1;
+    int32 to_index = 2;
 }
 
 // An empty track_id resumes the current track
@@ -59,6 +79,10 @@ message PreviousRequest {}
 
 message ShuffleRequest {}
 
+message SetRepeatRequest {
+    RepeatMode repeat = 1;
+}
+
 message TrackEndedRequest {
     string track_id = 1;
 }
@@ -75,12 +99,14 @@ service PlayerService {
     rpc GetState(GetStateRequest) returns (GetStateResponse);
     rpc Add(AddRequest) returns (StateResponse);
     rpc Remove(RemoveRequest) returns (StateResponse);
+    rpc Move(MoveRequest) returns (StateResponse);
     rpc Play(PlayRequest) returns (StateResponse);
     rpc Pause(PauseRequest) returns (StateResponse);
     rpc Seek(SeekRequest) returns (StateResponse);
     rpc Next(NextRequest) returns (StateResponse);
     rpc Previous(PreviousRequest) returns (StateResponse);
     rpc Shuffle(ShuffleRequest) returns (StateResponse);
+    rpc SetRepeat(SetRepeatRequest) returns (StateResponse);
     rpc TrackEnded(TrackEndedRequest) returns (StateResponse);
 
     rpc BroadcastStateChanged(StateChangedEvent) returns (rootsdk.Void);

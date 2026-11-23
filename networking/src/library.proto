@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+import "player.proto";
+
+// Favorites are personal, so this service never broadcasts: each member only ever sees their own list
+message ListFavoritesRequest {}
+
+message ToggleFavoriteRequest {
+    Track track = 1;
+}
+
+message FavoritesResponse {
+    repeated Track favorites = 1;
+}
+
+service LibraryService {
+    rpc ListFavorites(ListFavoritesRequest) returns (FavoritesResponse);
+    rpc ToggleFavorite(ToggleFavoriteRequest) returns (FavoritesResponse);
+}
