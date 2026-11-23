@@ -50,6 +50,7 @@ export const usePlayer = () => {
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const stateRef = useRef<PlayerState | null>(null);
     const loadedTrack = useRef<string | null>(null);
+    const reportedReady = useRef<string | null>(null);
     const clockOffset = useRef(0);
 
     if (!audioRef.current) audioRef.current = new Audio();
@@ -59,9 +60,10 @@ export const usePlayer = () => {
     // kept in a ref so its identity never changes and the bar's animation loop isn't restarted on every render
     const getPosition = useRef(() => (audio.getAttribute("src") ? audio.currentTime : 0)).current;
 
-    // Where shared playback is right now, extrapolated from the last state with the server's clock
+    // Where shared playback is right now, extrapolated from the last state with the server's clock; a buffering
+    // track stays where it is, because its clock hasn't started yet
     const expectedPosition = (player: PlayerState) => {
-        if (!player.playing) return player.position;
+        if (!player.playing || player.buffering) return player.position;
         return player.position + (Date.now() + clockOffset.current - player.updatedAt) / 1000;
     };
 
@@ -126,11 +128,19 @@ export const usePlayer = () => {
         if (audio.readyState >= HTMLMediaElement.HAVE_METADATA) {
             const target = expectedPosition(player);
             if (Math.abs(audio.currentTime - target) > constants.driftTolerance) audio.currentTime = target;
+
+            // This device has the audio: tell the server once, so the track can start for everyone from 0:00
+            if (player.buffering && reportedReady.current !== track.id) {
+                reportedReady.current = track.id;
+                playerServiceClient.trackReady({ trackId: track.id }).then((response) => applyState(response.state), () => {});
+            }
         }
+        if (!player.buffering) reportedReady.current = null;
 
         // Browsers refuse to start sound before the user has interacted with the page; the UI offers a button then
-        if (player.playing && audio.paused) audio.play().then(() => setBlocked(false), () => setBlocked(true));
-        else if (!player.playing && !audio.paused) audio.pause();
+        const shouldPlay = player.playing && !player.buffering;
+        if (shouldPlay && audio.paused) audio.play().then(() => setBlocked(false), () => setBlocked(true));
+        else if (!shouldPlay && !audio.paused) audio.pause();
     };
 
     const applyState = (player: PlayerState | undefined) => {
@@ -216,6 +226,8 @@ export const usePlayer = () => {
         currentTrack: state?.queue[state.current] ?? null,
         duration,
         loading,
+        // The audio is here, but the track waits at 0:00 for the other listeners
+        waiting: loading === null && !!state?.buffering,
         blocked,
         error,
         volume,

@@ -22,6 +22,7 @@ import {
     StateResponse,
     Track,
     TrackEndedRequest,
+    TrackReadyRequest,
 } from "@verve/gen-shared";
 import { getAudioChunk, prepareAudio, retainAudio } from "./audioCache";
 import constants from "./constants";
@@ -30,19 +31,34 @@ import { Audio, emptyTrack, LinkContents, makeTrack } from "./sources/track";
 
 // One player per community: each community gets its own server instance, so module state is that community's player.
 // current is -1 while idle (nothing loaded, or the queue played to the end)
-const state: PlayerState = { queue: [], current: -1, playing: false, position: 0, updatedAt: Date.now(), repeat: RepeatMode.OFF, listeners: 0 };
+const state: PlayerState = {
+    queue: [],
+    current: -1,
+    playing: false,
+    position: 0,
+    updatedAt: Date.now(),
+    repeat: RepeatMode.OFF,
+    listeners: 0,
+    buffering: false,
+};
 
 // Counts downloads that failed in a row, so a queue where nothing can be fetched stops instead of skipping forever
 let failedInARow = 0;
 
-const positionNow = () => (state.playing ? state.position + (Date.now() - state.updatedAt) / 1000 : state.position);
+// While a new track is buffering: which track, who already has its audio, and the timer that starts it anyway
+const buffer = { trackId: "", ready: new Set<string>(), timer: undefined as NodeJS.Timeout | undefined };
 
+const positionNow = () => (state.playing && !state.buffering ? state.position + (Date.now() - state.updatedAt) / 1000 : state.position);
+
+// Any explicit change of playback (pause, seek, resume) ends buffering; only switching tracks starts it
 const setPlayback = (playing: boolean, position: number) => {
     state.playing = playing;
+    state.buffering = false;
     state.position = Math.max(0, position);
     state.updatedAt = Date.now();
 };
 
+// A track that should play doesn't start its clock yet: it buffers at 0:00 until listeners have downloaded it
 const goTo = (index: number, playing: boolean) => {
     if (index < 0 || index >= state.queue.length) {
         state.current = -1;
@@ -51,6 +67,7 @@ const goTo = (index: number, playing: boolean) => {
 
     state.current = index;
     setPlayback(playing, 0);
+    state.buffering = playing;
 };
 
 // With repeat-all the queue wraps around instead of going idle after the last track
@@ -87,9 +104,6 @@ const fromClient = (track: Track, userId: string) =>
         coverUrl: track.coverUrl.startsWith("https://") ? track.coverUrl.slice(0, 500) : "",
     });
 
-// Gives up waiting after a while; the download keeps going and the track simply starts a little late for everyone
-const waitAtMost = (promise: Promise<unknown>, ms: number) => Promise.race([promise.catch(() => {}), new Promise((resolve) => setTimeout(resolve, ms))]);
-
 export class PlayerService extends PlayerServiceBase {
     // A restart (deploy, crash) brings the queue back paused where it was, rather than guessing how far it got.
     // Tracks saved before sources existed (plain file links) can't be played anymore and are dropped
@@ -111,6 +125,8 @@ export class PlayerService extends PlayerServiceBase {
     watchListeners() {
         const update = () => {
             state.listeners = rootServer.clients.getClients().length;
+            // Someone who leaves while a track buffers may have been the last one everyone was waiting for
+            if (state.buffering && buffer.ready.size && this.everyoneReady()) return this.startBuffered(buffer.trackId);
             this.broadcastStateChanged({ state }, "all");
         };
 
@@ -122,8 +138,26 @@ export class PlayerService extends PlayerServiceBase {
     private commit(client?: Client): StateResponse {
         rootServer.dataStore.appData.set({ key: constants.stateKey, value: state }).catch((error) => console.error("Saving player state failed:", error));
         this.broadcastStateChanged({ state }, "all", client);
+        this.watchBuffering();
         this.prefetch();
         return { state };
+    }
+
+    // Arms the safety timer once per buffering track: a listener whose download stalls mustn't hold everyone at 0:00
+    private watchBuffering() {
+        const trackId = state.buffering ? (state.queue[state.current]?.id ?? "") : "";
+        if (trackId === buffer.trackId) return;
+
+        clearTimeout(buffer.timer);
+        buffer.trackId = trackId;
+        buffer.ready.clear();
+        if (trackId) buffer.timer = setTimeout(() => this.startBuffered(trackId), constants.bufferTimeoutMs);
+    }
+
+    private startBuffered(trackId: string) {
+        if (!state.buffering || state.queue[state.current]?.id !== trackId) return;
+        setPlayback(true, 0);
+        this.commit();
     }
 
     // Keeps the playing and the next track downloaded, so changing tracks doesn't wait for YouTube or SoundCloud.
@@ -160,8 +194,7 @@ export class PlayerService extends PlayerServiceBase {
         this.commit();
     }
 
-    // Adding to an idle player starts the first new track like a jukebox, after giving the server a moment to fetch it,
-    // so listeners don't miss the opening seconds
+    // Adding to an idle player starts the first new track like a jukebox; it buffers until listeners have it
     private async enqueue(tracks: Track[], client: Client): Promise<StateResponse> {
         const room = constants.maxQueueLength - state.queue.length;
         if (room <= 0) throw fail(PlayerError.QUEUE_FULL, "The queue is full");
@@ -169,10 +202,7 @@ export class PlayerService extends PlayerServiceBase {
         const added = tracks.slice(0, room);
         state.queue.push(...added);
 
-        if (state.current === -1) {
-            await waitAtMost(prepareAudio(added[0]), constants.startWaitMs);
-            if (state.current === -1 && state.queue.includes(added[0])) goTo(state.queue.indexOf(added[0]), true);
-        }
+        if (state.current === -1) goTo(state.queue.indexOf(added[0]), true);
         return this.commit(client);
     }
 
@@ -303,9 +333,24 @@ export class PlayerService extends PlayerServiceBase {
         return this.commit(client);
     }
 
+    // The clock starts once every member with the app open has the audio, or when the timer in watchBuffering runs out
+    async trackReady(request: TrackReadyRequest, client: Client): Promise<StateResponse> {
+        if (!state.buffering || state.queue[state.current]?.id !== request.trackId) return { state };
+
+        buffer.ready.add(client.userId);
+        if (!this.everyoneReady()) return { state };
+
+        setPlayback(true, 0);
+        return this.commit();
+    }
+
+    private everyoneReady() {
+        return rootServer.clients.getClients().every((attached) => buffer.ready.has(attached.userId));
+    }
+
     // Every listening device reports the end, so only the first report for the playing track counts
     async trackEnded(request: TrackEndedRequest, client: Client): Promise<StateResponse> {
-        if (!state.playing || state.queue[state.current]?.id !== request.trackId) return { state };
+        if (!state.playing || state.buffering || state.queue[state.current]?.id !== request.trackId) return { state };
 
         if (state.repeat === RepeatMode.ONE) setPlayback(true, 0);
         else goToNext(true);

@@ -28,6 +28,8 @@ export const PlayerCard = ({ player, library, nameOf }: Props) => {
     const repeat = player.state?.repeat ?? RepeatMode.OFF;
     const favorite = library.isFavorite(track);
     const loading = player.loading;
+    // Actually making sound: playing, downloaded, and not held at 0:00 for other listeners
+    const audible = playing && loading === null && !player.waiting;
 
     // Unmuting brings back the level from before muting rather than jumping to full volume
     const lastVolume = useRef(player.volume || 0.5);
@@ -43,7 +45,7 @@ export const PlayerCard = ({ player, library, nameOf }: Props) => {
                 <AnimatePresence mode="popLayout" initial={false}>
                     <motion.div
                         key={track?.id ?? "empty"}
-                        className={`cover-frame${playing && loading === null ? " playing" : ""}`}
+                        className={`cover-frame${audible ? " playing" : ""}`}
                         initial={{ opacity: 0, scale: 0.85, rotate: -4 }}
                         animate={{ opacity: 1, scale: 1, rotate: 0 }}
                         exit={{ opacity: 0, scale: 1.08 }}
@@ -54,13 +56,22 @@ export const PlayerCard = ({ player, library, nameOf }: Props) => {
                 </AnimatePresence>
 
                 <AnimatePresence>
-                    {loading !== null && (
-                        <motion.div className="cover-loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} role="status">
-                            <svg viewBox="0 0 48 48" aria-hidden="true">
-                                <circle cx="24" cy="24" r="20" className="ring-track" />
-                                <motion.circle cx="24" cy="24" r="20" className="ring-fill" animate={{ pathLength: Math.max(loading, 0.04) }} transition={{ duration: 0.3 }} />
-                            </svg>
-                            <span>Loading {Math.round(loading * 100)}%</span>
+                    {(loading !== null || player.waiting) && (
+                        <motion.div key="cover-loading" className="cover-loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} role="status">
+                            {loading !== null ? (
+                                <>
+                                    <svg viewBox="0 0 48 48" aria-hidden="true">
+                                        <circle cx="24" cy="24" r="20" className="ring-track" />
+                                        <motion.circle cx="24" cy="24" r="20" className="ring-fill" animate={{ pathLength: Math.max(loading, 0.04) }} transition={{ duration: 0.3 }} />
+                                    </svg>
+                                    <span>Loading {Math.round(loading * 100)}%</span>
+                                </>
+                            ) : (
+                                <>
+                                    <span className="spinner large" aria-hidden="true" />
+                                    <span>Starting for everyone…</span>
+                                </>
+                            )}
                         </motion.div>
                     )}
                 </AnimatePresence>
@@ -117,7 +128,7 @@ export const PlayerCard = ({ player, library, nameOf }: Props) => {
                     </motion.button>
                 </div>
 
-                <SeekBar getPosition={player.getPosition} duration={player.duration} playing={playing && loading === null} disabled={!track || loading !== null} onSeek={player.seek} />
+                <SeekBar getPosition={player.getPosition} duration={player.duration} playing={audible} disabled={!track || loading !== null} onSeek={player.seek} />
 
                 <div className="player-controls">
                     <div className="transport">

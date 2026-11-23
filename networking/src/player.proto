@@ -41,6 +41,8 @@ message PlayerState {
     double updated_at = 5;
     RepeatMode repeat = 6;
     int32 listeners = 7;
+    // A new track waits at 0:00 until listeners have its audio (or a timeout passes), so nobody misses the start
+    bool buffering = 8;
 }
 
 enum PlayerError {
@@ -128,6 +130,10 @@ message TrackEndedRequest {
     string track_id = 1;
 }
 
+message TrackReadyRequest {
+    string track_id = 1;
+}
+
 message StateResponse {
     PlayerState state = 1;
 }
@@ -152,6 +158,7 @@ service PlayerService {
     rpc Shuffle(ShuffleRequest) returns (StateResponse);
     rpc SetRepeat(SetRepeatRequest) returns (StateResponse);
     rpc TrackEnded(TrackEndedRequest) returns (StateResponse);
+    rpc TrackReady(TrackReadyRequest) returns (StateResponse);
 
     rpc BroadcastStateChanged(StateChangedEvent) returns (rootsdk.Void);
 }
