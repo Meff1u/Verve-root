@@ -70,7 +70,9 @@ export const PlayerCard = ({ player, library, nameOf, visualizer }: Props) => {
 
             <div className="player-main">
                 <div className="player-head">
-                    <AnimatePresence mode="wait" initial={false}>
+                    {/* popLayout shows the new title at once; "wait" would hold it back until the old one finished leaving,
+                        which never happens while the tab is in the background and animation frames are paused */}
+                    <AnimatePresence mode="popLayout" initial={false}>
                         <motion.div
                             key={track?.id ?? "empty"}
                             className="player-titles"

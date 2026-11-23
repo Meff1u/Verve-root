@@ -29,6 +29,28 @@ export const makeTrack = (fields: Partial<Track>): Track => ({
     artist: (fields.artist || "").slice(0, constants.maxTitleLength),
 });
 
+const normalize = (text: string) =>
+    text
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/\p{M}/gu, "")
+        .replace(/[^\p{L}\p{N}]+/gu, " ")
+        .trim();
+
+const ignoredWords = new Set(["feat", "ft", "prod", "official", "video", "audio", "lyrics", "lyric", "music", "remastered", "version"]);
+
+// Is the candidate the same song? Every meaningful word of the title must appear in it; bracketed extras and
+// "- Remastered 2011" style suffixes are left out, because platforms write them differently. Length alone isn't
+// enough: an artist's other songs often run just as long, and playing one of those is worse than skipping
+export const matchesTitle = (title: string, candidate: string) => {
+    const core = title.replace(/\([^)]*\)|\[[^\]]*\]/g, " ").replace(/\s[-–—]\s.*$/, "");
+    const words = normalize(core || title)
+        .split(" ")
+        .filter((word) => word.length > 1 && !ignoredWords.has(word));
+    const haystack = ` ${normalize(candidate)} `;
+    return words.length > 0 && words.every((word) => haystack.includes(` ${word} `));
+};
+
 // Hour-long mixes would fill the server's memory and take ages to send, so they're left out of results and imports
 export const isPlayableLength = (track: Track) => !track.duration || track.duration <= constants.maxTrackSeconds;
 

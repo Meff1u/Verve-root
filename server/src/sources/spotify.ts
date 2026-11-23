@@ -1,7 +1,7 @@
 import type { SpotifyUrlInfo } from "spotify-url-info";
 import { Source, Track } from "@verve/gen-shared";
 import constants from "../constants";
-import { Audio, isPlayableLength, makeTrack } from "./track";
+import { Audio, isPlayableLength, makeTrack, matchesTitle } from "./track";
 import { downloadYoutube, searchYoutube } from "./youtube";
 
 // The package's type file declares its export as a type only, so the function itself comes in through require
@@ -31,10 +31,13 @@ export const importSpotify = async (url: URL): Promise<Track[]> => {
         .filter(isPlayableLength);
 };
 
-// Spotify has no audio for us, so the track is looked up on YouTube Music; candidates closest in length go first
+// Spotify has no audio for us, so the track is looked up on YouTube Music: only results with the same title and
+// about the same length count, closest length first; with no such result the track is skipped, not swapped for another
 export const downloadSpotify = async (track: Track): Promise<Audio> => {
     const candidates = (await searchYoutube(`${track.artist} ${track.title}`))
         .slice(0, constants.spotifyMatchCandidates)
+        .filter((candidate) => matchesTitle(track.title, candidate.title))
+        .filter((candidate) => !track.duration || !candidate.duration || Math.abs(candidate.duration - track.duration) <= constants.matchToleranceSeconds)
         .sort((a, b) => Math.abs(a.duration - track.duration) - Math.abs(b.duration - track.duration));
     if (!candidates.length) throw new Error(`No YouTube match for ${track.artist} - ${track.title}`);
 

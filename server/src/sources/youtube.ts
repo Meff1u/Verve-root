@@ -2,7 +2,7 @@ import vm from "vm";
 import { Innertube, Platform } from "youtubei.js";
 import { Source, Track } from "@verve/gen-shared";
 import constants from "../constants";
-import { Audio, collect, isPlayableLength, makeTrack } from "./track";
+import { Audio, collect, isPlayableLength, makeTrack, matchesTitle } from "./track";
 
 type Thumbnail = { url: string; width: number };
 
@@ -111,14 +111,15 @@ const downloadVideo = async (videoId: string): Promise<Audio> => {
     throw lastError;
 };
 
-// Other uploads of the same song (official video, lyric video, topic channel) with about the same length
+// Other uploads of the same song (official video, lyric video, topic channel): same title and about the same length
 const findAlternatives = async (track: Track) => {
     const yt = await getSession();
     const results = await yt.search(`${track.artist} ${track.title}`, { type: "video" });
-    const videos = (results.videos ?? []) as unknown as { id?: string; duration?: { seconds: number } }[];
+    const videos = (results.videos ?? []) as unknown as { id?: string; title?: { text?: string }; duration?: { seconds: number } }[];
 
     return videos
         .filter((video) => video.id && video.id !== track.sourceId)
+        .filter((video) => matchesTitle(track.title, video.title?.text ?? ""))
         .filter((video) => !track.duration || Math.abs((video.duration?.seconds ?? 0) - track.duration) <= constants.matchToleranceSeconds)
         .map((video) => video.id!)
         .slice(0, constants.youtubeAlternatives);
