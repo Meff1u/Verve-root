@@ -242,6 +242,7 @@ export const usePlayer = () => {
         next: () => run(() => playerServiceClient.next({})),
         previous: () => run(() => playerServiceClient.previous({})),
         shuffle: () => run(() => playerServiceClient.shuffle({})),
+        clear: () => run(() => playerServiceClient.clear({})),
         move: (trackId: string, toIndex: number) => run(() => playerServiceClient.move({ trackId, toIndex })),
         cycleRepeat: () => run(() => playerServiceClient.setRepeat({ repeat: nextRepeat[stateRef.current?.repeat ?? RepeatMode.OFF] })),
         clearError: () => setError(null),

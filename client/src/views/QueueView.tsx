@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, Reorder, useDragControls } from "motion/react";
-import { ChevronDown, ChevronUp, GripVertical, Link2, MoreVertical, Shuffle, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, GripVertical, Link2, ListX, MoreVertical, Shuffle, Trash2 } from "lucide-react";
 import { Track } from "@verve/gen-shared";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { TrackActionsSheet } from "../components/TrackActionsSheet";
 import { TrackRow } from "../components/TrackRow";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { Player } from "../hooks/usePlayer";
+import constants from "../constants";
 import { plural } from "../utils/format";
 import { spring, viewVariants } from "../utils/motion";
 
@@ -129,6 +130,19 @@ export const QueueView = ({ player, nameOf, confirmRemove, onImport }: Props) =>
         setPending(null);
     };
 
+    // Opening the tab jumps straight to the playing track, so a long queue doesn't start at its already played top;
+    // it jumps instead of gliding, because a smooth scroll gets cut short by the view's entry animation, and waits
+    // until the previous view has left and this one is in place
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            document.querySelector(".queue-view .track-row.current")?.scrollIntoView({ block: "center" });
+        }, constants.queueScrollDelay);
+        return () => clearTimeout(timer);
+    }, []);
+
+    // Clearing affects everyone listening, so it always asks first, whatever the remove-confirmation setting says
+    const [clearing, setClearing] = useState(false);
+
     // The actions sheet keeps the last track it showed while it slides away, like the confirm dialog
     const mobile = useIsMobile();
     const [sheetOpen, setSheetOpen] = useState(false);
@@ -153,6 +167,9 @@ export const QueueView = ({ player, nameOf, confirmRemove, onImport }: Props) =>
                 <div className="view-actions">
                     <button className="button ghost" onClick={player.shuffle} disabled={queue.length - current < 3} title="Shuffle upcoming tracks">
                         <Shuffle aria-hidden="true" /> {mobile ? "Shuffle" : "Shuffle upcoming"}
+                    </button>
+                    <button className="button ghost danger-text" onClick={() => setClearing(true)} disabled={!queue.length}>
+                        <ListX aria-hidden="true" /> {mobile ? "Clear" : "Clear queue"}
                     </button>
                     <button className="button primary" onClick={onImport}>
                         <Link2 aria-hidden="true" /> {mobile ? "Import" : "Import link"}
@@ -195,6 +212,18 @@ export const QueueView = ({ player, nameOf, confirmRemove, onImport }: Props) =>
                 player={player}
                 onRemove={remove}
                 onClose={() => setSheetOpen(false)}
+            />
+
+            <ConfirmDialog
+                open={clearing}
+                title="Clear the queue?"
+                message={`All ${plural(queue.length, "track", "tracks")} will be removed and playback stops for everyone listening.`}
+                confirmLabel="Clear queue"
+                onConfirm={() => {
+                    player.clear();
+                    setClearing(false);
+                }}
+                onCancel={() => setClearing(false)}
             />
 
             <ConfirmDialog

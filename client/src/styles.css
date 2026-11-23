@@ -1055,6 +1055,11 @@ input[type="range"]::-moz-range-thumb {
     height: 18px;
 }
 
+.button.ghost.danger-text {
+    color: var(--danger);
+    border-color: rgba(248, 113, 113, 0.35);
+}
+
 .button.danger {
     background: rgba(248, 113, 113, 0.16);
     border: 1px solid rgba(248, 113, 113, 0.5);

@@ -122,6 +122,8 @@ message PreviousRequest {}
 
 message ShuffleRequest {}
 
+message ClearRequest {}
+
 message SetRepeatRequest {
     RepeatMode repeat = 1;
 }
@@ -156,6 +158,7 @@ service PlayerService {
     rpc Next(NextRequest) returns (StateResponse);
     rpc Previous(PreviousRequest) returns (StateResponse);
     rpc Shuffle(ShuffleRequest) returns (StateResponse);
+    rpc Clear(ClearRequest) returns (StateResponse);
     rpc SetRepeat(SetRepeatRequest) returns (StateResponse);
     rpc TrackEnded(TrackEndedRequest) returns (StateResponse);
     rpc TrackReady(TrackReadyRequest) returns (StateResponse);

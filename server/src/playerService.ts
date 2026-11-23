@@ -328,6 +328,13 @@ export class PlayerService extends PlayerServiceBase {
         return this.commit(client);
     }
 
+    // Empties the whole queue and stops playback; the cached audio is dropped on the next prefetch
+    async clear(_request: unknown, client: Client): Promise<StateResponse> {
+        state.queue = [];
+        goTo(-1, false);
+        return this.commit(client);
+    }
+
     async setRepeat(request: SetRepeatRequest, client: Client): Promise<StateResponse> {
         state.repeat = request.repeat in RepeatMode ? request.repeat : RepeatMode.OFF;
         return this.commit(client);

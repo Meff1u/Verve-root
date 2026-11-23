@@ -7,6 +7,8 @@ export default {
     syncInterval: 1000,
     queuePreviewLength: 4,
     mobileBreakpoint: 860,
+    // Long enough for the previous tab to leave and the queue to slide in before jumping to the playing track
+    queueScrollDelay: 400,
     searchDelay: 400,
     resolveDelay: 350,
     importPreviewLength: 5,
