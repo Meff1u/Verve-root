@@ -3,7 +3,8 @@ import { motion } from "motion/react";
 import { Player } from "../hooks/usePlayer";
 import { viewVariants } from "../utils/motion";
 import { Settings } from "../hooks/useSettings";
-import packageJson from "../../package.json";
+// The manifest is what Root versions the app by, so the About line shows the same number as the portal
+import manifest from "../../../root-manifest.json";
 
 type Props = {
     player: Player;
@@ -72,7 +73,7 @@ export const SettingsView = ({ player, settings, onChange }: Props) => (
         <section className="card settings-group" aria-labelledby="about-title">
             <h2 id="about-title">About</h2>
             <p className="muted">
-                Verve v{packageJson.version} · a shared music player for Root communities. Everyone listens on their own device while the queue and playback position stay in sync.
+                Verve v{manifest.version} · a shared music player for Root communities. Everyone listens on their own device while the queue and playback position stay in sync.
                 Search uses YouTube Music and SoundCloud; Spotify links are matched to YouTube Music.
             </p>
         </section>
